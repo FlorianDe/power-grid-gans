@@ -30,5 +30,12 @@ If you are using pip execute the following:
 ```bash
 pip install -r requirements.txt
 ```
+
+## Developing
+When training models we can use tensorboard to keep track of out models.
+Run tensorboard with the following command:
+```bash
+tensorboard --logdir . 
+```
 # Docs
 tbd
