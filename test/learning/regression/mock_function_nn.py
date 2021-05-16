@@ -3,11 +3,12 @@ from datetime import datetime
 
 import torch
 import torch.nn as nn
+from tensorboardX import SummaryWriter
 from torch.utils.data import TensorDataset, DataLoader
-from torch.utils.tensorboard import SummaryWriter
-
 
 # torch.autograd.set_detect_anomaly(True)
+from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
+
 
 class PolynomialLayer(nn.Module):
     def __init__(self, _order: int):
@@ -67,10 +68,32 @@ class MockFunctionNN:
                     global_step=epoch * len(self.trainloader) + i
                 )
 
+            if (self.runs / 100) < 2 or (epoch % math.ceil(self.runs / 100)) == 0:
+                with torch.no_grad():
+                    TensorboardUtils.plot_graph_as_figure(
+                        tag="function/comparison",
+                        writer=writer,
+                        plot_data=[
+                            GraphPlotItem(
+                                label="real",
+                                x=self.x_samples.detach().numpy(),
+                                y=self.y_samples.detach().numpy(),
+                                color='c'
+                            ),
+                            GraphPlotItem(
+                                label="pred",
+                                x=self.x_samples.detach().numpy(),
+                                y=self.model(self.x_samples).detach().numpy(),
+                                color='r'
+                            ),
+                        ],
+                        global_step=epoch * len(self.trainloader)
+                    )
+
         polynomial_str = self.model.string()
         print(f'Result: {polynomial_str}')
         self.writer.add_text('Result', polynomial_str, runs)
-        self.writer.close()
+        # self.writer.close()
 
 
 if __name__ == "__main__":
@@ -83,15 +106,13 @@ if __name__ == "__main__":
     batchSize = steps
     x_samples = torch.linspace(start, end, steps)
     y_samples = torch.sin(x_samples)
-    runs = 100_000
+    runs = 500_000
     writer = SummaryWriter(
         f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
     mockFunction = MockFunctionNN(order, x_samples, y_samples, writer, runs, batchSize)
     mockFunction.run()
 
     y_lastPred = mockFunction.model(x_samples)
-    for i in range(len(x_samples)):
-        print(f'{i}: {x_samples[i]}->{y_lastPred[i]}')
-        writer.add_scalar(f'function/real', y_samples[i], i)
-        writer.add_scalar(f'function/pred', y_lastPred[i], i)
+
+
 
