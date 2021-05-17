@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_autograd/polynomial_autograd.html#sphx-glr-beginner-examples-autograd-polynomial-autograd-py
+
 from runner import Runner
 
 import torch

@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_nn/dynamic_net.html#sphx-glr-beginner-examples-nn-dynamic-net-py
+
 import math
 import random
 

@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_tensor/polynomial_tensor.html#sphx-glr-beginner-examples-tensor-polynomial-tensor-py
+
 import math
 
 import torch

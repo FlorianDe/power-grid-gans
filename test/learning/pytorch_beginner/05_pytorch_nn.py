@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_nn/polynomial_nn.html#sphx-glr-beginner-examples-nn-polynomial-nn-py
+
 import math
 
 import torch

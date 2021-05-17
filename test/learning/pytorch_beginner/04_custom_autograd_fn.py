@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_autograd/polynomial_custom_function.html#sphx-glr-beginner-examples-autograd-polynomial-custom-function-py
+
 import math
 
 import torch

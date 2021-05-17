@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_nn/polynomial_optim.html#sphx-glr-beginner-examples-nn-polynomial-optim-py
+
 import math
 
 import torch

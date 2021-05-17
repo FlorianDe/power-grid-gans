@@ -1,3 +1,6 @@
+# From:
+# https://pytorch.org/tutorials/beginner/examples_tensor/polynomial_numpy.html#sphx-glr-beginner-examples-tensor-polynomial-numpy-py
+
 import math
 
 import numpy as np
