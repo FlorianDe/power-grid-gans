@@ -1,13 +1,18 @@
+import argparse
 import math
+import os
 from datetime import datetime
 
 import torch
 import torch.nn as nn
 from tensorboardX import SummaryWriter
 from torch.utils.data import TensorDataset, DataLoader
+from tqdm import tqdm
+
+from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
+
 
 # torch.autograd.set_detect_anomaly(True)
-from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
 
 
 class PolynomialLayer(nn.Module):
@@ -30,32 +35,38 @@ class PolynomialLayer(nn.Module):
         return 'y=' + ' + '.join(expressions)
 
 
-class MockFunctionNN:
-    def __init__(self, _order: int, _x_samples, _y_samples, _writer, _runs=1, _batch_size=50):
+class RegressionNet:
+    def __init__(self, _net_name, _order: int, _x_samples, _y_samples, _runs=1, _batch_size=50):
         self.model = PolynomialLayer(_order)
+        self.net_name = _net_name
         self.x_samples = _x_samples
         self.y_samples = _y_samples
-        self.writer = _writer
         self.runs = _runs
         self.criterion = torch.nn.MSELoss(reduction='sum')
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6, momentum=0.97)
-        self.trainloader = DataLoader(
+        self.train_loader = DataLoader(
             TensorDataset(_x_samples, _y_samples),
             batch_size=min(len(_x_samples), _batch_size),
             shuffle=True,
             # num_workers=2
         )
 
-        if torch.cuda.is_available():
-            self.x_samples = self.x_samples.to('cuda')
-            print("Cuda support available, transferring all tensors to the gpu!")
-        else:
-            print("No cuda support available!")
+    def load(self, state_dict):
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
 
-    def run(self):
-        for epoch in range(self.runs):
+    def save(self, path):
+        torch.save(self.model.state_dict(), f'{path}/model.pt')
+
+    def calc(self, values):
+        with torch.no_grad():
+            return self.model(values)
+
+    def train(self, writer: SummaryWriter):
+        self.model.train()
+        for epoch in tqdm(range(self.runs)):
             running_loss = 0
-            for i, data in enumerate(self.trainloader, 0):
+            for i, data in enumerate(self.train_loader, 0):
                 x_samples_batch, y_samples_batch = data
                 y_pred = self.model(x_samples_batch)
                 loss = self.criterion(y_pred, y_samples_batch)
@@ -65,39 +76,39 @@ class MockFunctionNN:
                 running_loss += loss
 
             if (self.runs / 100) < 2 or (epoch % math.ceil(self.runs / 100)) == 0:
-                self.writer.add_scalar(
+                writer.add_scalar(
                     tag='training loss',
-                    scalar_value=running_loss/len(self.trainloader),
-                    global_step=epoch * len(self.trainloader)
+                    scalar_value=running_loss / len(self.train_loader),
+                    global_step=epoch * len(self.train_loader)
                 )
-                with torch.no_grad():
-                    TensorboardUtils.plot_graph_as_figure(
-                        tag="function/comparison",
-                        writer=writer,
-                        plot_data=[
-                            GraphPlotItem(
-                                label="real",
-                                x=self.x_samples.detach().numpy(),
-                                y=self.y_samples.detach().numpy(),
-                                color='c'
-                            ),
-                            GraphPlotItem(
-                                label="pred",
-                                x=self.x_samples.detach().numpy(),
-                                y=self.model(self.x_samples).detach().numpy(),
-                                color='r'
-                            ),
-                        ],
-                        global_step=epoch * len(self.trainloader)
-                    )
+                TensorboardUtils.plot_graph_as_figure(
+                    tag="function/comparison",
+                    writer=writer,
+                    plot_data=[
+                        GraphPlotItem(
+                            label="real",
+                            x=self.x_samples.detach().numpy(),
+                            y=self.y_samples.detach().numpy(),
+                            color='c'
+                        ),
+                        GraphPlotItem(
+                            label="pred",
+                            x=self.x_samples.detach().numpy(),
+                            y=self.calc(self.x_samples).detach().numpy(),
+                            color='r'
+                        ),
+                    ],
+                    global_step=epoch * len(self.train_loader)
+                )
 
         polynomial_str = self.model.string()
         print(f'Result: {polynomial_str}')
-        self.writer.add_text('Result', polynomial_str, runs)
+        writer.add_text(net_name, polynomial_str, runs)
+        self.save(self.net_name)
 
 
 if __name__ == "__main__":
-    order = 5
+    order = 5  # Should be saved too
     start = - math.pi
     end = math.pi
     func = torch.sin
@@ -106,12 +117,31 @@ if __name__ == "__main__":
     batchSize = 10  # steps
     x_samples = torch.linspace(start, end, steps)
     y_samples = torch.sin(x_samples)
-    runs = 20_000
-    writer = SummaryWriter(
-        f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
-    mockFunction = MockFunctionNN(order, x_samples, y_samples, writer, runs, batchSize)
-    mockFunction.run()
+    runs = 100_000
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", default=True, action='store_true', help="Enable cuda computation")
+    parser.add_argument("--load", help="The model path which should be loaded.")
+    parser.add_argument("--eval", help="Set the model to training mode else computation mode.")
+    args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda and torch.cuda.is_available() else "cpu")
+    print(
+        "Cuda support available, transferring all tensors to the gpu!" if torch.cuda.is_available() else
+        "No cuda support available!"
+    )
+    print(f'Using default device for tensors: {device}')
+    net_name = f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+    writer = SummaryWriter(f'{net_name}')
+    regression_net = RegressionNet(net_name, order, x_samples, y_samples, runs, batchSize)
+    if args.load and os.path.isfile(args.load):
+        print(f'Loading model state from: {args.load}')
+        state = torch.load(args.load)
+        regression_net.load(state)
+    if args.eval:
+        xVal = float(args.eval)
+        t = torch.tensor([xVal])
+        print(f'p(x): {xVal} -> {regression_net.calc(t)}')  # eval the sample x value
+        print(f'r(x): {xVal} -> {func(t)}')  # eval the sample x value
+    else:
+        regression_net.train(writer)  # further train the net
+
     writer.close()
-
-
-
