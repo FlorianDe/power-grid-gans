@@ -18,12 +18,13 @@ from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
 class PolynomialLayer(nn.Module):
     def __init__(self, _order: int, _device):
         super().__init__()
+        self.device = _device
         if _order < 1:
             raise ValueError("Order has to be at least 1 for a linear regression!")
-        self.params = nn.ParameterList([nn.Parameter(torch.randn((), device=self._device), requires_grad=True) for _ in range(_order + 1)])
+        self.params = nn.ParameterList([nn.Parameter(torch.randn((), device=self.device), requires_grad=True) for _ in range(_order + 1)])
 
     def forward(self, x):
-        value = torch.zeros(x.size(), requires_grad=False, device=self._device)
+        value = torch.zeros(x.size(), requires_grad=False, device=self.device)
         for order, coefficient in enumerate(self.params):
             value += (x.pow(order)).multiply(coefficient)
         return value
