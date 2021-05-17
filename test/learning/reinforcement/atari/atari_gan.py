@@ -136,11 +136,12 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--cuda", default=False, action='store_true', help="Enable cuda computation"
+        "--cuda", default=True, action='store_true', help="Enable cuda computation"
     )
     args = parser.parse_args()
 
     device = torch.device("cuda" if args.cuda else "cpu")
+    print(f'Using default device for tensors: {device}')
     envs = [
         InputWrapper(gym.make(name))
         for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')

@@ -53,9 +53,8 @@ oauthlib==3.1.0
     # via requests-oauthlib
 opencv-python==4.4.0.46
     # via -r requirements.in
-pillow===8.2.0
+pillow==8.2.0
     # via
-    #   -r requirements.in
     #   matplotlib
     #   torchvision
 protobuf==3.17.0

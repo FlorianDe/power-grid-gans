@@ -26,23 +26,51 @@ If you are using pip-tools use:
 pip-sync
 ```
 
+Deactivate virtual environment by running
+```bash
+deactivate
+```
+
 If you are using pip execute the following:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Developing
+### Profiling
+#### 1. Tensorboard
 When training models we can use tensorboard to keep track of out models.
 Run tensorboard with the following command:
 ```bash
 tensorboard --logdir . 
 ```
+
+### Problems
+#### 1. Missing CUDA Version of  torch
 Currently pip-tools cannot specify where to download torch and what specific flavor so for cuda support do this manually.
 Pip command can be generated here: https://pytorch.org/get-started/locally/
 
 Sample:
 ```bash
 pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+```
+
+#### 2. Atari [FileNotFoundError: Could not find module ale_c.dll](https://github.com/openai/gym/issues/1726#issuecomment-550580367)
+1. Uninstall gym and atari-py (If already installed):
+```bash
+pip uninstall atari-py
+pip uninstall gym[atari]
+```
+
+2. Download VS build tools here: https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16
+3. Run the VS build setup and select "C++ build tools" and install it.
+4. Restart PC.
+
+5. Install cmake, atari-py and gym
+```bash
+pip install cmake
+pip install atari-py
+pip install gym[atari]
 ```
 # Docs
 tbd
