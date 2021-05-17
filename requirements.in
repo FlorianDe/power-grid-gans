@@ -4,3 +4,9 @@ torchaudio===0.8.1
 tensorboard===2.5.0
 tensorboardX===2.2
 matplotlib===3.4.2
+
+
+Pillow===8.2.0
+gym
+atari-py
+opencv-python==4.4.0.46
