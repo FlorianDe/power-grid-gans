@@ -37,5 +37,12 @@ Run tensorboard with the following command:
 ```bash
 tensorboard --logdir . 
 ```
+Currently pip-tools cannot specify where to download torch and what specific flavor so for cuda support do this manually.
+Pip command can be generated here: https://pytorch.org/get-started/locally/
+
+Sample:
+```bash
+pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+```
 # Docs
 tbd
