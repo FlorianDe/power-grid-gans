@@ -38,11 +38,11 @@ class MockFunctionNN:
         self.writer = _writer
         self.runs = _runs
         self.criterion = torch.nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6, momentum=0.97)
         self.trainloader = DataLoader(
             TensorDataset(_x_samples, _y_samples),
             batch_size=min(len(_x_samples), _batch_size),
-            # shuffle=True,
+            shuffle=True,
             # num_workers=2
         )
 
@@ -54,6 +54,7 @@ class MockFunctionNN:
 
     def run(self):
         for epoch in range(self.runs):
+            running_loss = 0
             for i, data in enumerate(self.trainloader, 0):
                 x_samples_batch, y_samples_batch = data
                 y_pred = self.model(x_samples_batch)
@@ -61,14 +62,14 @@ class MockFunctionNN:
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-
-                self.writer.add_scalar(
-                    tag='training loss',
-                    scalar_value=loss.item(),
-                    global_step=epoch * len(self.trainloader) + i
-                )
+                running_loss += loss
 
             if (self.runs / 100) < 2 or (epoch % math.ceil(self.runs / 100)) == 0:
+                self.writer.add_scalar(
+                    tag='training loss',
+                    scalar_value=running_loss/len(self.trainloader),
+                    global_step=epoch * len(self.trainloader)
+                )
                 with torch.no_grad():
                     TensorboardUtils.plot_graph_as_figure(
                         tag="function/comparison",
@@ -93,7 +94,6 @@ class MockFunctionNN:
         polynomial_str = self.model.string()
         print(f'Result: {polynomial_str}')
         self.writer.add_text('Result', polynomial_str, runs)
-        # self.writer.close()
 
 
 if __name__ == "__main__":
@@ -103,16 +103,15 @@ if __name__ == "__main__":
     func = torch.sin
     stepSize = 0.2
     steps = math.floor((end - start) / stepSize)
-    batchSize = steps
+    batchSize = 10  # steps
     x_samples = torch.linspace(start, end, steps)
     y_samples = torch.sin(x_samples)
-    runs = 500_000
+    runs = 20_000
     writer = SummaryWriter(
         f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
     mockFunction = MockFunctionNN(order, x_samples, y_samples, writer, runs, batchSize)
     mockFunction.run()
-
-    y_lastPred = mockFunction.model(x_samples)
+    writer.close()
 
 
 
