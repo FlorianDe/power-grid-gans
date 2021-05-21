@@ -2,7 +2,6 @@ import argparse
 import math
 import os
 from datetime import datetime
-from typing import Literal
 import torch
 import torch.nn as nn
 from tensorboardX import SummaryWriter
@@ -61,11 +60,12 @@ class RegressionNet:
         torch.save(self.model.state_dict(), f'{path}/model.pt')
 
     def calc(self, values):
+        self.model.eval()  # Set the model to "eval" mode, alias for model.train(mode=False)
         with torch.no_grad():
             return self.model(values)
 
     def train(self, writer: SummaryWriter):
-        self.model.train()
+        self.model.train()  # Set the model to "train" mode
         for epoch in tqdm(range(self.runs)):
             running_loss = 0
             for i, data in enumerate(self.train_loader, 0):
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     )
     print(f'Using default device for tensors: {device}')
 
-    order = 5  # Should be saved too
+    order = 6  # Should be saved too
     start = - math.pi
     end = math.pi
     func = torch.sin
@@ -140,10 +140,12 @@ if __name__ == "__main__":
         print(f'Loading model state from: {args.load}')
         state = torch.load(args.load)
         regression_net.load(state)
+
     if args.eval:
         xVal = float(args.eval)
         t = torch.tensor([xVal])
-        print(f'p(x): {xVal} -> {regression_net.calc(t)}')  # eval the sample x value
+        predictedVal = regression_net.calc(t)
+        print(f'p(x): {xVal} -> {predictedVal}')  # eval the sample x value
         print(f'r(x): {xVal} -> {func(t)}')  # eval the sample x value
     else:
         regression_net.train(writer)  # further train the net
