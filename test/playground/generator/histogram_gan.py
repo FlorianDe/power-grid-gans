@@ -6,66 +6,9 @@ from tensorboardX import SummaryWriter
 import numpy as np
 
 from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
+from models.histogram_discriminator import HistogramDiscriminator
+from models.histogram_generator import HistogramGenerator
 from utils.histogram_utils import generate_noisy_normal_distribution
-
-
-class HistogramDiscriminator(nn.Module):
-    def __init__(self, input_resolution: int, filter_size: int):
-        super(HistogramDiscriminator, self).__init__()
-        self.input_resolution = input_resolution
-        self.model = nn.Sequential(
-            nn.Linear(in_features=input_resolution, out_features=1),
-            nn.Sigmoid()
-            # nn.Conv1d(
-            #     in_channels=self.input_resolution,
-            #     out_channels=filter_size,
-            #     kernel_size=3,
-            #     stride=2,
-            #     padding=1
-            # ),
-            # nn.ReLU(),
-            # nn.BatchNorm1d(filter_size),
-            # nn.Conv1d(
-            #     in_channels=filter_size,
-            #     out_channels=filter_size*2,
-            #     kernel_size=3,
-            #     stride=1,
-            #     padding=0
-            # ),
-            # nn.Sigmoid()  # replace via a softmax for labels!
-        )
-
-    def forward(self, x):
-        out = self.model(x)
-        return out.view(-1, 1).squeeze(dim=1)
-
-
-class HistogramGenerator(nn.Module):
-    def __init__(self, latent_vector_size: int, out_features: int):
-        super(HistogramGenerator, self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(in_features=latent_vector_size, out_features=out_features),
-            nn.ReLU(),
-            # nn.ConvTranspose1d(
-            #     in_channels=latent_vector_size,
-            #     out_channels=filter_size*2,
-            #     kernel_size=3,
-            #     stride=1,
-            #     padding=0
-            # ),
-            # nn.ReLU(),
-            # nn.BatchNorm1d(filter_size*2),
-            # nn.Conv1d(
-            #     in_channels=filter_size*2,
-            #     out_channels=filter_size,
-            #     kernel_size=3,
-            #     stride=2,
-            # ),
-            # nn.Tanh()
-        )
-
-    def forward(self, x):
-        return self.model(x)
 
 
 if __name__ == "__main__":
@@ -104,48 +47,48 @@ if __name__ == "__main__":
         gen_input_v.normal_(0, 1)
         gen_output_v = net_gener(gen_input_v)
 
-        # train discriminator
-        dis_optimizer.zero_grad()
-        dis_output_true_v = net_discr(real_data)
-        dis_output_fake_v = net_discr(gen_output_v.detach())
-        dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
-        dis_loss.backward()
-        dis_optimizer.step()
-        dis_losses.append(dis_loss.item())
-
-        # train generator
-        gen_optimizer.zero_grad()
-        dis_output_v = net_discr(gen_output_v)
-        gen_loss_v = objective(dis_output_v, true_labels_v)
-        gen_loss_v.backward()
-        gen_optimizer.step()
-        gen_losses.append(gen_loss_v.item())
+        # # train discriminator
+        # dis_optimizer.zero_grad()
+        # dis_output_true_v = net_discr(real_data)
+        # dis_output_fake_v = net_discr(gen_output_v.detach())
+        # dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
+        # dis_loss.backward()
+        # dis_optimizer.step()
+        # dis_losses.append(dis_loss.item())
         #
-        iter_no += 1
-        if iter_no % 1000 == 0:
-            print(f'Iter {iter_no}: gen_loss={np.mean(gen_losses)}, dis_loss={np.mean(dis_losses)}')
-            writer.add_scalar("gen_loss", np.mean(gen_losses), iter_no)
-            writer.add_scalar("dis_loss", np.mean(dis_losses), iter_no)
-            gen_losses = []
-            dis_losses = []
-        if iter_no % 2000 == 0:
-            x = [i for i in range(len(real_data))]
-            TensorboardUtils.plot_graph_as_figure(
-                tag="fake/real",
-                writer=writer,
-                plot_data=[
-                    GraphPlotItem(
-                        label="real",
-                        x=x,
-                        y=real_data.detach().numpy(),
-                        color='c'
-                    ),
-                    GraphPlotItem(
-                        label="pred",
-                        x=x,
-                        y=gen_output_v.detach().numpy(),
-                        color='r'
-                    ),
-                ],
-                global_step=iter_no
-            )
+        # # train generator
+        # gen_optimizer.zero_grad()
+        # dis_output_v = net_discr(gen_output_v)
+        # gen_loss_v = objective(dis_output_v, true_labels_v)
+        # gen_loss_v.backward()
+        # gen_optimizer.step()
+        # gen_losses.append(gen_loss_v.item())
+        # #
+        # iter_no += 1
+        # if iter_no % 1000 == 0:
+        #     print(f'Iter {iter_no}: gen_loss={np.mean(gen_losses)}, dis_loss={np.mean(dis_losses)}')
+        #     writer.add_scalar("gen_loss", np.mean(gen_losses), iter_no)
+        #     writer.add_scalar("dis_loss", np.mean(dis_losses), iter_no)
+        #     gen_losses = []
+        #     dis_losses = []
+        # if iter_no % 2000 == 0:
+        #     x = [i for i in range(len(real_data))]
+        #     TensorboardUtils.plot_graph_as_figure(
+        #         tag="fake/real",
+        #         writer=writer,
+        #         plot_data=[
+        #             GraphPlotItem(
+        #                 label="real",
+        #                 x=x,
+        #                 y=real_data.detach().numpy(),
+        #                 color='c'
+        #             ),
+        #             GraphPlotItem(
+        #                 label="pred",
+        #                 x=x,
+        #                 y=gen_output_v.detach().numpy(),
+        #                 color='r'
+        #             ),
+        #         ],
+        #         global_step=iter_no
+        #     )
