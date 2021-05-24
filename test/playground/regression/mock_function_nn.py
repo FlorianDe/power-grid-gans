@@ -122,14 +122,14 @@ class RegressionNet:
                     plot_data=[
                         GraphPlotItem(
                             label="real",
-                            x=self.x_samples.detach().numpy(),
-                            y=self.y_samples.detach().numpy(),
+                            x=self.x_samples.detach().cpu().numpy(),
+                            y=self.y_samples.detach().cpu().numpy(),
                             color='c'
                         ),
                         GraphPlotItem(
                             label="pred",
-                            x=self.x_samples.detach().numpy(),
-                            y=self.calc(self.x_samples).detach().numpy(),
+                            x=self.x_samples.detach().cpu().numpy(),
+                            y=self.calc(self.x_samples).detach().cpu().numpy(),
                             color='r'
                         ),
                     ],
