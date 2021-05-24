@@ -36,10 +36,26 @@ class HistogramDiscriminator(nn.Module):
             stride=2,
             padding=1
         )
+        self.relu1 = nn.LeakyReLU(0.2, inplace=True)
         self.conv2 = nn.Conv1d(filters, filters * 2, 5, 2, 1)
+        self.bn2 = nn.BatchNorm1d(filters * 2)
+        self.relu2 = nn.LeakyReLU(0.2, inplace=True)
         self.conv3 = nn.Conv1d(filters * 2, filters * 4, 4, 2, 1)
+        self.bn3 = nn.BatchNorm1d(filters * 4)
+        self.relu3 = nn.LeakyReLU(0.2, inplace=True)
         self.conv4 = nn.Conv1d(filters * 4, filters * 8, 3, 2, 1)
-        self.conv5 = nn.Conv1d(filters * 8, 1, 2, 2, 1)
+        self.bn4 = nn.BatchNorm1d(filters * 8)
+        self.relu4 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv5 = nn.Conv1d(filters * 8, filters * 16, 3, 2, 1)
+        self.bn5 = nn.BatchNorm1d(filters * 16)
+        self.relu5 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv6 = nn.Conv1d(filters * 16, filters * 32, 3, 2, 1)
+        self.bn6 = nn.BatchNorm1d(filters * 32)
+        self.relu6 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv7 = nn.Conv1d(filters * 32, filters * 64, 3, 2, 1)
+        self.bn7 = nn.BatchNorm1d(filters * 64)
+        self.relu7 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv8 = nn.Conv1d(filters * 64, self.channels_disc_out, 3, 2, 1)
         self.sigmoid = nn.Sigmoid()
         pytorch_total_params = sum(p.numel() for p in self.parameters())
         print(f'Discriminator Parameter Count: {pytorch_total_params}')
@@ -50,11 +66,14 @@ class HistogramDiscriminator(nn.Module):
         Args:
             x (torch.Tensor): input tensor of shape: [batch, channels, features]
         """
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
-        x = self.conv5(x) # Last conv layer
+        x = self.relu1(self.conv1(x))
+        x = self.relu2(self.bn2(self.conv2(x)))
+        x = self.relu3(self.bn3(self.conv3(x)))
+        x = self.relu4(self.bn4(self.conv4(x)))
+        x = self.relu5(self.bn5(self.conv5(x)))
+        x = self.relu6(self.bn6(self.conv6(x)))
+        x = self.relu7(self.bn7(self.conv7(x)))
+        x = self.conv8(x)
         x = self.sigmoid(x)  # Outputs need to be positiv for BCE
         x = x.view(-1, 1).squeeze(dim=1)
         return x
@@ -63,9 +82,9 @@ class HistogramDiscriminator(nn.Module):
 if __name__ == "__main__":
     # torch.manual_seed(1)
 
-    BATCH_SIZE = 20
-    FILTERS = 4
-    D_in = 24  # input size of G
+    BATCH_SIZE = 15
+    FILTERS = 20
+    D_in = 144  # input size of G
     H = 10  # number of  hidden neurons
     D_out = 6  # output size of G
 

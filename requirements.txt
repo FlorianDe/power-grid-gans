@@ -107,6 +107,8 @@ torch===1.8.1
     #   torchvision
 torchaudio===0.8.1
     # via -r requirements.in
+torchsummary===1.5.1
+    # via -r requirements.in
 torchvision===0.9.1
     # via -r requirements.in
 tqdm===4.60.0

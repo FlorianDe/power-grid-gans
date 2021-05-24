@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision.utils as vutils
+from torchsummary import summary
 from tensorboardX import SummaryWriter
 import numpy as np
 
@@ -13,11 +13,11 @@ from utils.histogram_utils import generate_noisy_normal_distribution
 
 if __name__ == "__main__":
     BATCH_SIZE = 10
-    LATENT_VECTOR_SIZE = 20
-    HISTOGRAM_SIZE = 24
-    LEARNING_RATE = 0.0001
-    DISCR_FILTERS = 4
-    GENER_FILTERS = 4
+    LATENT_VECTOR_SIZE = 16
+    HISTOGRAM_SIZE = 144  # 10min takt
+    LEARNING_RATE = 0.001
+    DISCR_FILTERS = 2
+    GENER_FILTERS = 2
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net_discr = HistogramDiscriminator(
@@ -45,6 +45,11 @@ if __name__ == "__main__":
     iter_no = 0
 
     writer = SummaryWriter()
+    summary(net_discr, (1, HISTOGRAM_SIZE), BATCH_SIZE)
+    summary(net_gener, (LATENT_VECTOR_SIZE, 1), BATCH_SIZE)
+    writer.add_graph(net_gener, torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1))
+    writer.add_graph(net_discr, torch.FloatTensor(BATCH_SIZE, 1, HISTOGRAM_SIZE))
+
     for i in range(1_000_000):
         real_data = torch.from_numpy(np.array([generate_noisy_normal_distribution(HISTOGRAM_SIZE).astype(dtype=np.float32) for _ in range(BATCH_SIZE)])).reshape(BATCH_SIZE, 1, HISTOGRAM_SIZE)
 
@@ -71,13 +76,13 @@ if __name__ == "__main__":
         gen_losses.append(gen_loss_v.item())
 
         iter_no += 1
-        if iter_no % 1000 == 0:
+        if iter_no % 100 == 0:
             print(f'Iter {iter_no}: gen_loss={np.mean(gen_losses)}, dis_loss={np.mean(dis_losses)}')
             writer.add_scalar("gen_loss", np.mean(gen_losses), iter_no)
             writer.add_scalar("dis_loss", np.mean(dis_losses), iter_no)
             gen_losses = []
             dis_losses = []
-        if iter_no % 1000 == 0:
+        if iter_no % 500 == 0:
             sample_from_real_data = real_data.detach().squeeze(dim=1).numpy()[0]
             x = [i for i in range(len(sample_from_real_data))]
             TensorboardUtils.plot_graph_as_figure(
