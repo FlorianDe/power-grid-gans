@@ -326,3 +326,6 @@ pip-selfcheck.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,python,venv,virtualenv,pycharm+all,visualstudiocode
+
+
+runs/
