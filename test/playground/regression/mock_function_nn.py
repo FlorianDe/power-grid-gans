@@ -1,7 +1,11 @@
 import argparse
+import copy
 import math
 import os
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
+
 import torch
 import torch.nn as nn
 from tensorboardX import SummaryWriter
@@ -14,13 +18,22 @@ from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
 # torch.autograd.set_detect_anomaly(True)
 
 
+@dataclass
+class MinLossModel:
+    model: Optional[nn.Module] = None
+    step: int = 0
+    loss: float = float("inf")
+    formula_printed: bool = False
+
+
 class PolynomialLayer(nn.Module):
     def __init__(self, _order: int, _device):
         super().__init__()
         self.device = _device
         if _order < 1:
             raise ValueError("Order has to be at least 1 for a linear regression!")
-        self.params = nn.ParameterList([nn.Parameter(torch.randn((), device=self.device), requires_grad=True) for _ in range(_order + 1)])
+        self.params = nn.ParameterList(
+            [nn.Parameter(torch.randn((), device=self.device), requires_grad=True) for _ in range(_order + 1)])
 
     def forward(self, x):
         value = torch.zeros(x.size(), requires_grad=False, device=self.device)
@@ -31,7 +44,7 @@ class PolynomialLayer(nn.Module):
     def string(self):
         expressions = [""] * len(self.params)
         for order in range(len(self.params)):
-            expressions[order] = f'{self.params[order].item()}*x^{order}'
+            expressions[order] = f'{self.params[order].item()}' + (f'*x^{order}' if order > 0 else '')
         return 'y=' + ' + '.join(expressions)
 
 
@@ -44,7 +57,8 @@ class RegressionNet:
         self.y_samples = _y_samples
         self.runs = _runs
         self.criterion = torch.nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6, momentum=0.97)
+        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6, momentum=0.97)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, betas=(0.5, 0.999))
         self.train_loader = DataLoader(
             TensorDataset(_x_samples, _y_samples),
             batch_size=min(len(_x_samples), _batch_size),
@@ -66,6 +80,8 @@ class RegressionNet:
 
     def train(self, writer: SummaryWriter):
         self.model.train()  # Set the model to "train" mode
+        batches = len(self.train_loader)
+        min_loss_model = MinLossModel()
         for epoch in tqdm(range(self.runs)):
             running_loss = 0
             for i, data in enumerate(self.train_loader, 0):
@@ -77,11 +93,28 @@ class RegressionNet:
                 self.optimizer.step()
                 running_loss += loss
 
+            global_step = epoch * batches
+            avg_loss = running_loss / batches
+            if avg_loss < min_loss_model.loss:
+                min_loss_model.model = copy.deepcopy(self.model)
+                min_loss_model.loss = avg_loss
+                min_loss_model.step = global_step
+                writer.add_scalar(
+                    tag='training loss improvements',
+                    scalar_value=avg_loss,
+                    global_step=global_step
+                )
+
+            # only print the formulas after 50% of the training
+            if min_loss_model.formula_printed is False and (self.runs*batches * 0.50) < global_step:
+                min_loss_model.formula_printed = True
+                writer.add_text(net_name, min_loss_model.model.string(), min_loss_model.step)
+
             if (self.runs / 100) < 2 or (epoch % math.ceil(self.runs / 100)) == 0:
                 writer.add_scalar(
                     tag='training loss',
-                    scalar_value=running_loss / len(self.train_loader),
-                    global_step=epoch * len(self.train_loader)
+                    scalar_value=avg_loss,
+                    global_step=global_step
                 )
                 TensorboardUtils.plot_graph_as_figure(
                     tag="function/comparison",
@@ -100,12 +133,13 @@ class RegressionNet:
                             color='r'
                         ),
                     ],
-                    global_step=epoch * len(self.train_loader)
+                    global_step=global_step
                 )
 
-        polynomial_str = self.model.string()
-        print(f'Result: {polynomial_str}')
-        writer.add_text(net_name, polynomial_str, runs)
+        print(f'Best regression: \n'
+              f'step: {min_loss_model.step}\n'
+              f'loss: {min_loss_model.loss}\n'
+              f'{min_loss_model.model.string()}')
         self.save(self.net_name)
 
 
@@ -122,7 +156,7 @@ if __name__ == "__main__":
     )
     print(f'Using default device for tensors: {device}')
 
-    order = 6  # Should be saved too
+    order = 3  # Should be saved too
     start = - math.pi
     end = math.pi
     func = torch.sin
@@ -131,7 +165,7 @@ if __name__ == "__main__":
     batchSize = 10  # steps
     x_samples = torch.linspace(start, end, steps, device=device)
     y_samples = torch.sin(x_samples).to(device)
-    runs = 100_000
+    runs = 10_000
 
     net_name = f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
     writer = SummaryWriter(f'{net_name}')
