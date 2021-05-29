@@ -1,10 +1,15 @@
+import sys
 import torch
 import torchvision
-import torchaudio
 import numpy as np
 
-print("Dependencies")
-print("torch: " + torch.__version__)
-print("torchvision: " + torchvision.__version__)
-print("torchaudio: " + torchaudio.__version__)
-print("numpy: " + np.__version__)
+dependencies = {
+    'torch': torch,
+    'torchvision': torchvision,
+    'numpy': np
+}
+if __name__ == "__main__":
+    print("Dependencies")
+    print(f'Using Python: {sys.prefix}')
+    for name, dependency in dependencies.items():
+        print(f'{name}: {dependency.__version__}')
