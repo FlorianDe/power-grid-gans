@@ -2,7 +2,8 @@ import math
 from dataclasses import dataclass
 import torch.nn as nn
 
-from test.learning.classification.digits.models.fnn import LinearNet
+from test.playground.classification.digits.models.fnn import LinearNet
+from test.playground.classification.digits.models.custom_module import CustomModule
 
 
 @dataclass
@@ -15,7 +16,7 @@ class ConvData:
     pooling: int = 2
 
 
-class ConvolutionalNet(nn.Module):
+class ConvolutionalNet(CustomModule):
     def __init__(self, img_size: tuple[int, int], conv_layers_data: list[ConvData] = None, linear_hidden_layers: list[int] = None):
         super(ConvolutionalNet, self).__init__()
         self.conv1 = nn.Sequential(
