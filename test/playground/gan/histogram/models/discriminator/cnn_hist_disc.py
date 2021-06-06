@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class PrintLayer(nn.Module):
@@ -13,7 +12,7 @@ class PrintLayer(nn.Module):
         return x
 
 
-class HistogramDiscriminator(nn.Module):
+class CNNHistogramDiscriminator(nn.Module):
     """
         Histogram model to determine whether a histogram is fake or not.
         
@@ -25,7 +24,7 @@ class HistogramDiscriminator(nn.Module):
     """
 
     def __init__(self, filters: int):
-        super(HistogramDiscriminator, self).__init__()
+        super(CNNHistogramDiscriminator, self).__init__()
         self.channels_disc_in = 1  # For now 1 since we only look at one feature 'wattage'
         self.channels_disc_out = 1  # For now 1 since we only want to check for binary classification
 
@@ -90,7 +89,7 @@ if __name__ == "__main__":
 
     fake_data = torch.randn(BATCH_SIZE, 1, D_in)
     fake_data_label = torch.zeros(BATCH_SIZE)
-    netD = HistogramDiscriminator(FILTERS)
+    netD = CNNHistogramDiscriminator(FILTERS)
     objective = nn.BCELoss()
     fake_data_pred = netD(fake_data)
     print(f'fake_data_pred {fake_data_pred.shape}: {fake_data_pred}')

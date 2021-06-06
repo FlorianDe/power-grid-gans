@@ -1,33 +1,35 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchsummary import summary
 from tensorboardX import SummaryWriter
-import numpy as np
+from torchsummary import summary
 
+from models.discriminator.rnn_hist_disc import RNNHistogramDiscriminator
+from models.generator.rnn_hist_gen import RNNHistogramGenerator
 from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
-from models.histogram_discriminator import HistogramDiscriminator
-from models.histogram_generator import HistogramGenerator
 from utils.histogram_utils import generate_noisy_normal_distribution
-
 
 if __name__ == "__main__":
     BATCH_SIZE = 10
-    LATENT_VECTOR_SIZE = 16
+    NOISE_VECTOR_SIZE = 16
     HISTOGRAM_SIZE = 144  # 10min takt
     LEARNING_RATE = 0.001
     DISCR_FILTERS = 2
     GENER_FILTERS = 2
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net_discr = HistogramDiscriminator(
-        filters=DISCR_FILTERS
-    ).to(device)
-    net_gener = HistogramGenerator(
-        latent_vector_size=LATENT_VECTOR_SIZE,
-        filters=GENER_FILTERS,
-        gen_features_out=HISTOGRAM_SIZE
-    ).to(device)
+    # net_discr = CNNHistogramDiscriminator(
+    #     filters=DISCR_FILTERS
+    # ).to(device)
+    # net_gener = CNNHistogramGenerator(
+    #     noise_vector_size=NOISE_VECTOR_SIZE,
+    #     filters=GENER_FILTERS,
+    #     gen_features_out=HISTOGRAM_SIZE
+    # ).to(device)
+    net_discr = RNNHistogramDiscriminator(input_size=HISTOGRAM_SIZE, num_layers=3, hidden_size=100).to(device)
+    net_gener = RNNHistogramGenerator(noise_vector_size=NOISE_VECTOR_SIZE, rnn_layers=24, rnn_hidden_size=100,
+                                      gen_features_out=HISTOGRAM_SIZE, ).to(device)
 
     objective = nn.BCELoss()
     gen_optimizer = optim.Adam(
@@ -45,16 +47,18 @@ if __name__ == "__main__":
     iter_no = 0
 
     writer = SummaryWriter()
-    summary(net_discr, (1, HISTOGRAM_SIZE), BATCH_SIZE)
-    summary(net_gener, (LATENT_VECTOR_SIZE, 1), BATCH_SIZE)
-    writer.add_graph(net_gener, torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1))
-    writer.add_graph(net_discr, torch.FloatTensor(BATCH_SIZE, 1, HISTOGRAM_SIZE))
+    # summary(net_discr, (1, HISTOGRAM_SIZE), BATCH_SIZE)
+    # summary(net_gener, (NOISE_VECTOR_SIZE, 1), BATCH_SIZE)
+    # writer.add_graph(net_gener, torch.FloatTensor(BATCH_SIZE, NOISE_VECTOR_SIZE, 1))
+    # writer.add_graph(net_discr, torch.FloatTensor(BATCH_SIZE, 1, HISTOGRAM_SIZE))
 
     for i in range(1_000_000):
-        real_data = torch.from_numpy(np.array([generate_noisy_normal_distribution(HISTOGRAM_SIZE).astype(dtype=np.float32) for _ in range(BATCH_SIZE)])).reshape(BATCH_SIZE, 1, HISTOGRAM_SIZE)
+        real_data = torch.from_numpy(np.array(
+            [generate_noisy_normal_distribution(HISTOGRAM_SIZE).astype(dtype=np.float32) for _ in
+             range(BATCH_SIZE)])).reshape(BATCH_SIZE, 1, HISTOGRAM_SIZE)
 
         # fake samples, input is 3D: batch, filters, x
-        gen_input_v = torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1)
+        gen_input_v = torch.FloatTensor(BATCH_SIZE, 1, NOISE_VECTOR_SIZE)
         gen_input_v.normal_(0, 1)
         gen_output_v = net_gener(gen_input_v)
 
