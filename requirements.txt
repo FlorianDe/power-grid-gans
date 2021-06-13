@@ -8,16 +8,26 @@ absl-py==0.12.0
     # via tensorboard
 atari-py==0.2.6
     # via -r requirements.in
+attrs==21.2.0
+    # via pytest
 cachetools==4.2.2
     # via google-auth
 certifi==2020.12.5
     # via requests
+cffi==1.14.5
+    # via cryptography
 chardet==4.0.0
     # via requests
 cloudpickle==1.6.0
     # via gym
+cryptography==3.4.7
+    # via pandapower
 cycler==0.10.0
     # via matplotlib
+decorator==4.4.2
+    # via networkx
+et-xmlfile==1.1.0
+    # via openpyxl
 future==0.18.2
     # via pyglet
 google-auth-oauthlib==0.4.4
@@ -32,18 +42,23 @@ gym==0.17.3
     # via -r requirements.in
 idna==2.10
     # via requests
+iniconfig==1.1.1
+    # via pytest
 kiwisolver==1.3.1
     # via matplotlib
 markdown==3.3.4
     # via tensorboard
 matplotlib===3.4.2
     # via -r requirements.in
+networkx==2.5.1
+    # via pandapower
 numpy==1.20.3
     # via
     #   atari-py
     #   gym
     #   matplotlib
     #   opencv-python
+    #   pandapower
     #   pandas
     #   scipy
     #   tensorboard
@@ -54,26 +69,46 @@ oauthlib==3.1.0
     # via requests-oauthlib
 opencv-python==4.4.0.46
     # via -r requirements.in
-pandas===1.2.4
+openpyxl==3.0.7
+    # via pandapower
+packaging==20.9
+    # via
+    #   pandapower
+    #   pytest
+pandapower===2.6.0
     # via -r requirements.in
+pandas===1.2.4
+    # via
+    #   -r requirements.in
+    #   pandapower
 pillow==8.2.0
     # via
     #   matplotlib
     #   torchvision
+pluggy==0.13.1
+    # via pytest
 protobuf==3.17.0
     # via
     #   tensorboard
     #   tensorboardx
+py==1.10.0
+    # via pytest
 pyasn1-modules==0.2.8
     # via google-auth
 pyasn1==0.4.8
     # via
     #   pyasn1-modules
     #   rsa
+pycparser==2.20
+    # via cffi
 pyglet==1.5.0
     # via gym
 pyparsing==2.4.7
-    # via matplotlib
+    # via
+    #   matplotlib
+    #   packaging
+pytest===6.2.4
+    # via -r requirements.in
 python-dateutil==2.8.1
     # via
     #   matplotlib
@@ -88,8 +123,10 @@ requests==2.25.1
     #   tensorboard
 rsa==4.7.2
     # via google-auth
-scipy==1.6.3
-    # via gym
+scipy==1.6.0
+    # via
+    #   gym
+    #   pandapower
 six==1.16.0
     # via
     #   absl-py
@@ -107,6 +144,8 @@ tensorboard===2.5.0
     # via -r requirements.in
 tensorboardx===2.2
     # via -r requirements.in
+toml==0.10.2
+    # via pytest
 torch===1.8.1
     # via
     #   -r requirements.in
@@ -130,6 +169,10 @@ wget===3.2
     # via -r requirements.in
 wheel==0.36.2
     # via tensorboard
+xlrd==2.0.1
+    # via pandapower
+xlsxwriter==1.4.3
+    # via pandapower
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

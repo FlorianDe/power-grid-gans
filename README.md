@@ -12,18 +12,24 @@ It is also recommended to use pip-tools.
 
 To create the virtual environment use *virtualenv*:
 ```bash
-virtualenv -p python3 venv
+virtualenv -p python3 power-grid-gans
+# or
+python3 -m venv power-grid-gans
 ```
 
 Activate the virtual environment by running
 ```bash
-source venv/bin/activate
+source power-grid-gans/bin/activate
 ```
 
 Next install the requirements from the *requirements.txt*
-If you are using pip-tools use:
+If you want to use pip-tools, install it first and run:
 ```bash
 pip-sync
+```
+If you are using pip execute the following:
+```bash
+pip install -r requirements.txt
 ```
 
 Deactivate virtual environment by running
@@ -31,10 +37,7 @@ Deactivate virtual environment by running
 deactivate
 ```
 
-If you are using pip execute the following:
-```bash
-pip install -r requirements.txt
-```
+
 
 ## Developing
 ### Profiling
