@@ -1,9 +1,10 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='power-grid-gans',
     version='0.0.1',
-    packages=[''],
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     url='',
     license='',
     author='floriande',

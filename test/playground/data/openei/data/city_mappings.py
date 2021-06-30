@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from test.playground.data.openei.data.city import City
+from test import City
 
 DEFAULT_PREFIX = 'RefBldg'
 

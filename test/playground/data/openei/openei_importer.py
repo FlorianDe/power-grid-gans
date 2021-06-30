@@ -8,7 +8,6 @@ from pandas import DatetimeIndex, DataFrame
 # Base code idea from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/commercial_data.py
 from test.playground.data.openei.data.building import Building
 from test.playground.data.openei.data.city import City
-from test.playground.data.openei.data.city_mappings import CITY_MAPPINGS
 
 BASE_URL = "https://openei.org/datasets/files/961/pub/COMMERCIAL_LOAD_DATA_E_PLUS_OUTPUT"
 

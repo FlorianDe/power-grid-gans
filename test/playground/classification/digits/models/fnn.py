@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from test.playground.classification.digits.models.custom_module import CustomModule
+from test import CustomModule
 
 
 class LinearNet(CustomModule):

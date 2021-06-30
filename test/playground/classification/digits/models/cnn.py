@@ -2,8 +2,8 @@ import math
 from dataclasses import dataclass
 import torch.nn as nn
 
-from test.playground.classification.digits.models.fnn import LinearNet
-from test.playground.classification.digits.models.custom_module import CustomModule
+from test import LinearNet
+from test import CustomModule
 
 
 @dataclass
