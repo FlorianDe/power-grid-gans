@@ -9,10 +9,11 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from tensorboardX import SummaryWriter
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
-from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
+from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 
 
 # torch.autograd.set_detect_anomaly(True)
@@ -58,13 +59,14 @@ class RegressionNet:
         self.runs = _runs
         self.criterion = torch.nn.MSELoss(reduction='sum')
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6, momentum=0.97)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, betas=(0.5, 0.999))
-        self.train_loader = DataLoader(
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.05, betas=(0.5, 0.999))
+        self.data_loader = DataLoader(
             TensorDataset(_x_samples, _y_samples),
             batch_size=min(len(_x_samples), _batch_size),
             shuffle=True,
             # num_workers=2
         )
+        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min', factor=0.97, patience=10, cooldown=10, min_lr=1e-9, threshold=1e-9)
 
     def load(self, state_dict):
         self.model.load_state_dict(state_dict)
@@ -80,11 +82,11 @@ class RegressionNet:
 
     def train(self, writer: SummaryWriter):
         self.model.train()  # Set the model to "train" mode
-        batches = len(self.train_loader)
+        batches = len(self.data_loader)
         min_loss_model = MinLossModel()
         for epoch in tqdm(range(self.runs)):
             running_loss = 0
-            for i, data in enumerate(self.train_loader, 0):
+            for i, data in enumerate(self.data_loader, 0):
                 x_samples_batch, y_samples_batch = data
                 y_pred = self.model(x_samples_batch)
                 loss = self.criterion(y_pred, y_samples_batch)
@@ -95,6 +97,9 @@ class RegressionNet:
 
             global_step = epoch * batches
             avg_loss = running_loss / batches
+            # Calculate
+            self.scheduler.step(avg_loss)
+            avg_lr = self.optimizer.param_groups[0]['lr']  # self.scheduler.get_last_lr()[0]
             if avg_loss < min_loss_model.loss:
                 min_loss_model.model = copy.deepcopy(self.model)
                 min_loss_model.loss = avg_loss
@@ -114,6 +119,11 @@ class RegressionNet:
                 writer.add_scalar(
                     tag='training loss',
                     scalar_value=avg_loss,
+                    global_step=global_step
+                )
+                writer.add_scalar(
+                    tag='learning rate',
+                    scalar_value=avg_lr,
                     global_step=global_step
                 )
                 TensorboardUtils.plot_graph_as_figure(
@@ -156,7 +166,7 @@ if __name__ == "__main__":
     )
     print(f'Using default device for tensors: {device}')
 
-    order = 3  # Should be saved too
+    order = 5  # Should be saved too
     start = - math.pi
     end = math.pi
     func = torch.sin
@@ -165,7 +175,7 @@ if __name__ == "__main__":
     batchSize = 10  # steps
     x_samples = torch.linspace(start, end, steps, device=device)
     y_samples = torch.sin(x_samples).to(device)
-    runs = 10_000
+    runs = 20_000
 
     net_name = f'runs/regression_order{order:03}_batches{batchSize:04}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
     writer = SummaryWriter(f'{net_name}')
