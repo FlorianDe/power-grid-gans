@@ -2,8 +2,8 @@ import math
 from dataclasses import dataclass
 import torch.nn as nn
 
-from test import LinearNet
-from test import CustomModule
+from src.net.custom_module  import CustomModule
+from src.net.dynamic.fnn import LinearNet
 
 
 @dataclass

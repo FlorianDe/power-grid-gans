@@ -3,11 +3,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tensorboardX import SummaryWriter
-from torchsummary import summary
 
 from models.discriminator.rnn_hist_disc import RNNHistogramDiscriminator
 from models.generator.rnn_hist_gen import RNNHistogramGenerator
-from src.tensorboard.utils import TensorboardUtils, GraphPlotItem
+from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 from utils.histogram_utils import generate_noisy_normal_distribution
 
 if __name__ == "__main__":

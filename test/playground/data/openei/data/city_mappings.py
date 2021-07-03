@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from test import City
+from city import City
 
 DEFAULT_PREFIX = 'RefBldg'
 

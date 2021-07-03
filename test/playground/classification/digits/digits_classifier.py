@@ -8,10 +8,8 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from models.fnn import LinearNet
-from models.cnn import ConvolutionalNet
-from models.rnn import RecurrentNet
-from models.custom_module import CustomModule
+from src.net.dynamic import LinearNet, ConvolutionalNet, RecurrentNet
+from src.net import CustomModule
 
 
 @dataclass

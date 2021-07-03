@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from test import CustomModule
+from src.net.custom_module import CustomModule
 
 
 class RecurrentNet(CustomModule):

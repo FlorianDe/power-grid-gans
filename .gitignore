@@ -330,3 +330,4 @@ pip-selfcheck.json
 
 runs/
 power-grid-gans/
+cached-data/
