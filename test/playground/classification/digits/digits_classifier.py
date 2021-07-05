@@ -8,8 +8,10 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from src.net.dynamic import LinearNet, ConvolutionalNet, RecurrentNet
+from src.net.dynamic import ConvolutionalNet, RecurrentNet
+
 from src.net import CustomModule
+from test.playground.classification.digits.models.digit_fnn import DigitLinearNet
 
 
 @dataclass
@@ -41,7 +43,7 @@ if __name__ == "__main__":
     sample_data = mnist_trainset.data[0]
     assert len(sample_data.shape) == 2, "The training set data has the wrong shape, it should be [x, y]"
     img_size = tuple(sample_data.shape)
-    fc_net = LinearNet(img_size[0]*img_size[1], [347, 49])
+    fc_net = DigitLinearNet(img_size[0]*img_size[1], 10, [347, 49])
     cnn_net = ConvolutionalNet(img_size, None, [50])
     rnn_net = RecurrentNet(img_size[0], img_size[1], 2, 128)
     nets = {

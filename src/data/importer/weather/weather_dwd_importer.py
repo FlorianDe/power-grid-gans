@@ -8,7 +8,6 @@ import numpy
 import pandas as pd
 import wget
 
-
 from src.utils.path_utils import unzip, get_root_project_path
 
 # Base code from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/weather_data.py
@@ -22,13 +21,13 @@ from src.utils.path_utils import unzip, get_root_project_path
 # reciprocal). So the calculation we need to apply is
 # 1 / (3.6*1e^3) * 1 / 1e^-4 = 1e^4 / (3.6*1e^3) = 1e^1 / 3.6
 # which is equal to:
-
-
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
 DATE_COL_SOL = 8
-DATA_START = "2009-01-01 00:00:00"
-DATA_END = "2019-12-31 23:00:00"
+DEFAULT_DATA_CACHE_FOLDER = 'cached-data'
+DEFAULT_DWD_WEATHER_DATA_PATH = "weather/dwd"
+DEFAULT_DATA_START_DATE = "2009-01-01 00:00:00"
+DEFAULT_DATA_END_DATE = "2019-12-31 23:00:00"
 BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly/"
 PRODUKT_FILE_NAME_BEGINNING = 'produkt'
 
@@ -96,36 +95,42 @@ weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
             ColumnMapping("   D", "wind_dir_degree", 1)
         ]
     ),
-    WeatherDimension.SUN: WeatherDataSet(
-        fileUrlPath="sun/historical/stundenwerte_SD_00691_19510101_20201231_hist",
-        columns=[
-            ColumnMapping("SD_SO", "sun_hours_min_per_h"),
-        ]
-    ),
+    # Length missmatch
     # WeatherDimension.CLOUD: WeatherDataSet(
     #     fileUrlPath="cloudiness/historical/stundenwerte_N_00691_19490101_20201231",
     #     columns=[
     #         ColumnMapping(" V_N", "cloud_percent", 12.5),
     #     ]
     # ),
+    # WeatherDimension.SUN: WeatherDataSet(
+    #     fileUrlPath="sun/historical/stundenwerte_SD_00691_19510101_20201231_hist",
+    #     columns=[
+    #         ColumnMapping("SD_SO", "sun_hours_min_per_h"),
+    #     ]
+    # ),
+
 }
 
 
 class DWDWeatherDataImporter:
-    DEFAULT_DATA_CACHE_FOLDER = 'cached-data'
-    DEFAULT_DWD_WEATHER_DATA_PATH = "weather/dwd"
-
-    def __init__(self, path: Optional[str] = None):
+    def __init__(
+            self,
+            start_date: str = DEFAULT_DATA_START_DATE,
+            end_date: str = DEFAULT_DATA_END_DATE,
+            path: Optional[str] = None
+    ):
         if path is None:
             root = get_root_project_path()
-            self.path = str(root.joinpath(DWDWeatherDataImporter.DEFAULT_DATA_CACHE_FOLDER).joinpath(DWDWeatherDataImporter.DEFAULT_DWD_WEATHER_DATA_PATH).absolute())
+            self.path = str(
+                root.joinpath(DEFAULT_DATA_CACHE_FOLDER).joinpath(DEFAULT_DWD_WEATHER_DATA_PATH).absolute())
         else:
             self.path = path
-
+        self.start_date = start_date
+        self.end_date = end_date
         self.data = pd.DataFrame(
             index=pd.date_range(
-                start=DATA_START,
-                end=DATA_END,
+                start=self.start_date,
+                end=self.end_date,
                 tz="Europe/Berlin",
                 freq="H",
             )
@@ -137,12 +142,8 @@ class DWDWeatherDataImporter:
 
     def __load(self):
         print(f'Loading and transforming data:')
-        self.__load_data_dimension(WeatherDimension.AIR)
-        self.__load_data_dimension(WeatherDimension.SOLAR)
-        self.__load_data_dimension(WeatherDimension.WIND)
-
-        # data = load_data(tmp, "cloud", data)  # Length missmatch
-        # data = load_data(tmp, "sun", data)
+        for dimension in weatherDataSourcesMap.keys():
+            self.__load_data_dimension(dimension)
 
         # data = data.clip(lower=0) # clip outlier data
 
@@ -191,7 +192,7 @@ class DWDWeatherDataImporter:
         csv = pd.read_csv(
             target_data_file, sep=";", index_col=1, parse_dates=[1], date_parser=weather_data_set.dateTimeParser
         )
-        csv = csv.loc[DATA_START:DATA_END]
+        csv = csv.loc[self.start_date:self.end_date]
 
         for column in weather_data_set.columns:
             print(f'{column.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')

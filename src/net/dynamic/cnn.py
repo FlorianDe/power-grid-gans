@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import torch.nn as nn
 
 from src.net.custom_module  import CustomModule
-from src.net.dynamic.fnn import LinearNet
+from src.net.dynamic.fnn import FNN
 
 
 @dataclass
@@ -54,7 +54,7 @@ class ConvolutionalNet(CustomModule):
             last_out_channels = c.out_channels
 
         self.flatten = nn.Flatten()
-        self.linear = LinearNet(h_out*w_out*last_out_channels, linear_hidden_layers)
+        self.linear = FNN(h_out * w_out * last_out_channels, linear_hidden_layers)
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
