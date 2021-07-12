@@ -40,6 +40,7 @@ class WeatherDimension(Enum):
     CLOUD = 'CLOUD'
 
 
+
 @dataclass
 class ExtraCalculatedMapping:
     targetColumn: str
@@ -201,8 +202,13 @@ class DWDWeatherDataImporter:
                 print(f'--> calculated data: tar_mean_col: {extraMapping.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')
                 self.data[extraMapping.targetColumn] = extraMapping.calculate(csv[column.sourceColumn].values, column.unitFactor)
 
+    def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+        return self.data.index.month.values, self.data.index.day.values, self.data.index.hour.values
+        # converted_dates = (self.data.index.month.values << 10) + (self.data.index.day.values << 5) + (self.data.index.hour.values)
+        # return [[int(x) for x in list('{0:0{bit_count}b}'.format(d, bit_count=14))] for d in converted_dates]
 
 if __name__ == "__main__":
     importer = DWDWeatherDataImporter()
     importer.initialize()
-    print("A")
+
+
