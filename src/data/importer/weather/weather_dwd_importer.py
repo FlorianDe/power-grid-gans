@@ -204,8 +204,6 @@ class DWDWeatherDataImporter:
 
     def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
         return self.data.index.month.values, self.data.index.day.values, self.data.index.hour.values
-        # converted_dates = (self.data.index.month.values << 10) + (self.data.index.day.values << 5) + (self.data.index.hour.values)
-        # return [[int(x) for x in list('{0:0{bit_count}b}'.format(d, bit_count=14))] for d in converted_dates]
 
 if __name__ == "__main__":
     importer = DWDWeatherDataImporter()
