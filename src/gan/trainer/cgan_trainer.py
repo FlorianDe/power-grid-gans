@@ -3,11 +3,13 @@ from typing import Union, Optional
 import numpy as np
 import torch.nn as nn
 import torch.optim
+
 from tensorboardX import SummaryWriter
 from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
+from src.data.dataholder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.trainer.trainer_types import TrainModel
 from src.net import CustomModule
@@ -15,12 +17,14 @@ from src.net.dynamic import FNN
 from src.utils.datetime_utils import dates_to_conditional_vectors
 from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 
+
 # torch.autograd.set_detect_anomaly(True)
 
 class CGANTrainer:
     def __init__(self,
                  generator: TrainModel,
                  discriminator: TrainModel,
+                 data_holder: DataHolder,
                  noise_vector_size: int,
                  batch_size: int = 10,
                  device: Union[torch.device, int, str] = 'cpu'
@@ -31,24 +35,13 @@ class CGANTrainer:
         self.noise_vector_size = noise_vector_size
         self.batch_size = batch_size
         self.device = device
-        self.data_importer = DWDWeatherDataImporter()
-        self.data_importer.initialize()
-        # This part could be refactored to use some kind of custom dataloader!
-        self.data = self.data_importer.data.values.astype(np.float32)
-        # if len(self.data) % sequence_length != 0:
-        #     raise ValueError(f'Cannot use a sequence length of {sequence_length} since the data set inside properly dividable {len(self.data) % sequence_length=}')
-        data_raw = torch.from_numpy(self.data)
-        # data = self.data.reshape(-1, 24, 6)
-        months, days, hours = self.data_importer.get_datetime_values()
-        data_labels_raw = torch.tensor(dates_to_conditional_vectors(months, days, hours))
-        # data_labels = data_labels_raw.reshape(-1, 24, 14)
+        self.data_holder = data_holder
 
-        print("Dataset Size:", self.data.shape)
-        print("Data Size:", data_raw.shape)
-        print("Labels Size:", data_labels_raw.shape)
+        print("Dataset Size:", self.data_holder.data.shape)
+        print("Labels Size:", self.data_holder.x.shape)
 
         self.data_loader = DataLoader(
-            TensorDataset(data_raw, data_labels_raw),
+            TensorDataset(torch.from_numpy(self.data_holder.data), torch.from_numpy(self.data_holder.x)),
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=True
@@ -84,17 +77,18 @@ class CGANTrainer:
 
     def __write_training_stats(self, real_data: Tensor, real_labels: Tensor):
         with torch.no_grad():
-            if self.iter_no % 100 == 0:
+            if self.iter_no % 500 == 0:
                 print(f'Iter {self.iter_no}: gen_loss={np.mean(self.gen_losses)}, dis_loss={np.mean(self.dis_losses)}')
                 self.writer.add_scalar("gen_loss", np.mean(self.gen_losses), self.iter_no)
                 self.writer.add_scalar("dis_loss", np.mean(self.dis_losses), self.iter_no)
                 self.__reset_running_calculations()
 
-            if self.iter_no % 5000 == 0:
-                real_data = real_data.detach().view(self.batch_size, -1).numpy()
-                noise = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)).astype(dtype=np.float32), repeats=self.batch_size, axis=0))
+            if self.iter_no % 2000 == 0:
+                real_data = self.data_holder.normalizer.renormalize(real_data.detach().view(self.batch_size, -1).numpy())
+                noise = torch.from_numpy(
+                    np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)).astype(dtype=np.float32), repeats=self.batch_size, axis=0))
                 generated_data = self.generator.model(noise, real_labels)
-                pred_data = generated_data.detach().view(self.batch_size, -1).numpy()
+                pred_data = self.data_holder.normalizer.renormalize(generated_data.detach().view(self.batch_size, -1).numpy())
                 x = [i for i in range(len(real_data))]
                 real_data_trans = real_data.transpose()
                 TensorboardUtils.plot_graph_as_figure(
@@ -133,9 +127,9 @@ class CGANTrainer:
                 z = torch.from_numpy(np.random.normal(0, 1, (self.batch_size, self.noise_vector_size)).astype(dtype=np.float32))
 
                 # TODO Generation should check for invalid days for specific month like 31.02 => isn't valid
-                months = np.random.randint(1, 12, batch_size)
-                days = np.random.randint(1, 31, batch_size)
-                hours = np.random.randint(0, 23, batch_size)
+                months = np.random.randint(1, 12, self.batch_size)
+                days = np.random.randint(1, 31, self.batch_size)
+                hours = np.random.randint(0, 23, self.batch_size)
                 gen_labels = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
 
                 # Generate a batch of data
@@ -171,6 +165,39 @@ class CGANTrainer:
                 self.__write_training_stats(real_data, labels)
 
 
+class CGANRNNGenerator(CustomModule):
+    def __init__(self, input_size: int, out_size: int):
+        super(CGANRNNGenerator, self).__init__()
+
+    def forward(self, x, h):
+        return x, h
+
+
+class CGANRNNDiscriminator(CustomModule):
+    def __init__(self, input_size: int, out_size: int = 1):
+        super(CGANRNNDiscriminator, self).__init__()
+        self.hidden_dim = 10
+        self.n_layers = 20
+
+        self.gru = nn.GRU(input_size, self.hidden_dim, self.n_layers, batch_first=True, dropout=0.8)
+        self.relu = nn.ReLU()
+        self.fc = nn.Linear(self.hidden_dim, out_size)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x, h, labels):
+        x = torch.dstack((x, labels))
+        out, h = self.gru(x, h)
+        print(f'{out.shape=}, {out=}')
+        out = self.fc(self.relu(out[:, -1]))
+        out = self.sigmoid(out)
+        return out, h
+
+    def init_hidden(self, batch_size):
+        weight = next(self.parameters()).data
+        hidden = weight.new(self.n_layers, batch_size, self.hidden_dim).zero_()
+        return hidden
+
+
 class CGANBasicGenerator(CustomModule):
     def __init__(self, input_size: int, out_size: int, hidden_layers: Optional[list[int]] = None):
         super(CGANBasicGenerator, self).__init__()
@@ -194,13 +221,17 @@ class CGANBasicDiscriminator(CustomModule):
         x = x.view(-1)
         return x
 
+
 if __name__ == '__main__':
+    data_importer = DWDWeatherDataImporter()
+    data_importer.initialize()
+    data_holder = DataHolder(data_importer.data.values.astype(np.float32), np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())))
     epochs = 10000
     noise_vector_size = 50
     # sequence_length = 24
-    batch_size = 7*24
-    features = 6
-    G_net = CGANBasicGenerator(input_size=noise_vector_size+14, out_size=features, hidden_layers=[200, 300, 150])
+    batch_size = 24#*7
+    features = data_holder.get_feature_size()
+    G_net = CGANBasicGenerator(input_size=noise_vector_size+14, out_size=features, hidden_layers=[200])
     G_optim = torch.optim.Adam(G_net.parameters())
     G_sched = StepLR(G_optim, step_size=30, gamma=0.1)
     G = TrainModel(G_net, G_optim, G_sched)
@@ -210,4 +241,38 @@ if __name__ == '__main__':
     D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)
 
-    CGANTrainer(G, D, noise_vector_size, batch_size, 'cpu').train(epochs)
+    CGANTrainer(G, D, data_holder, noise_vector_size, batch_size, 'cpu').train(epochs)
+
+    # # [batch, sequence, features]
+    # b1 = np.array([
+    #     [1.1, 2.2],
+    #     [3.1, 4.2],
+    #     [6.2, 7.3]
+    # ])
+    # b2 = np.array([
+    #     [1.4, 2.5],
+    #     [3.4, 4.6],
+    #     [6.3, 7.2]
+    # ])
+    # data_batch = torch.from_numpy(np.array([b1, b2 ])).type(torch.FloatTensor)
+    #
+    #
+    # # [batch, sequence, time_vector]
+    # labels_batch = torch.from_numpy(np.array([
+    #     [
+    #         [0, 0, 0, 1],
+    #         [0, 0, 1, 0],
+    #         [0, 0, 1, 1]
+    #     ], [
+    #         [0, 1, 0, 0],
+    #         [0, 1, 0, 1],
+    #         [0, 1, 1, 0]
+    #     ]
+    # ])).type(torch.FloatTensor)
+    #
+    # input_size = data_batch.shape[-1] + labels_batch.shape[-1]
+    # disc = CGANRNNDiscriminator(input_size)
+    # h = disc.init_hidden(len(data_batch))
+    #
+    # y, hn = disc(data_batch, h, labels_batch)
+    # print(f'{y=}, {hn=}')

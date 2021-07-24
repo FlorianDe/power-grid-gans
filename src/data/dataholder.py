@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.data.normalization.base_normalizer import BaseNormalizer
-from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
+from src.data.normalization.none_normalizer import NoneNormalizer
 
 
 class DataHolder:
@@ -21,7 +21,7 @@ class DataHolder:
             dates = numpy.fromiter(range(len(data)), dtype="float32")
 
         if normalizer_constructor is None:
-            normalizer_constructor = MinMaxNumpyNormalizer
+            normalizer_constructor = NoneNormalizer
         self.normalizer = normalizer_constructor()
         self.normalizer.fit(data)
         self.data = self.normalizer.normalize(data)
@@ -29,6 +29,9 @@ class DataHolder:
 
     def get_tensor_dataset(self):
         return TensorDataset(torch.from_numpy(self.data), torch.from_numpy(self.x))
+
+    def get_feature_size(self):
+        return self.data.shape[-1]
 
 
 if __name__ == '__main__':
