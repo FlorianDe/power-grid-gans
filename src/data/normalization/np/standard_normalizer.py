@@ -16,8 +16,8 @@ class StandardNumpyNormalizer(BaseNormalizer[np.array]):
     def fit(self, data: np.array, dim: int = 0) -> None:
         if data.ndim > 2:
             raise ValueError('Currently only supporting 2 dimensional input data [sequence, features]')
-        self.mu = np.mean(data, 0)
-        self.sigma = np.std(data, 0)
+        self.mu = np.mean(data, dim)
+        self.sigma = np.std(data, dim)
 
     def normalize(self, data: np.array) -> np.array:
         self.check_fitted()

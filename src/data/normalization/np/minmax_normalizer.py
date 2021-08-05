@@ -15,19 +15,18 @@ class MinMaxNumpyNormalizer(BaseNormalizer[np.array]):
     def fit(self, data: np.array, dim: int = 0) -> None:
         if data.ndim > 2:
             raise ValueError('Currently only supporting 2 dimensional input data [sequence, features]')
-        self.min = np.min(data, 0)
-        self.max = np.max(data, 0)
-        print(f'Using {self.min=}, {self.max=}')
+        self.min = np.min(data, dim)
+        self.max = np.max(data, dim)
 
     def normalize(self, data: np.array) -> np.array:
         self.check_fitted()
         normalized_data = data - self.min
-        normalized_data /= self.max
+        normalized_data = normalized_data / self.max
         return normalized_data
 
     def renormalize(self, data: np.array) -> np.array:
         self.check_fitted()
         renormalized_data = data * self.max
-        renormalized_data += self.min
+        renormalized_data = renormalized_data + self.min
 
         return renormalized_data
