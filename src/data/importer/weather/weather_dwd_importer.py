@@ -7,7 +7,9 @@ from typing import List, Callable, Optional
 import numpy
 import pandas as pd
 import wget
+from pandas import DataFrame
 
+from src.data.processor.pandas.pandas_preprocessor import PandasPreprocessor
 from src.utils.path_utils import unzip, get_root_project_path
 
 # Base code from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/weather_data.py
@@ -32,13 +34,16 @@ BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany
 PRODUKT_FILE_NAME_BEGINNING = 'produkt'
 
 
+def clip_to_zero(data: DataFrame) -> DataFrame:
+    return PandasPreprocessor(data).clip(0).run()
+
+
 class WeatherDimension(Enum):
     AIR = 'AIR'
     SOLAR = 'SOLAR'
     WIND = 'WIND'
     SUN = 'SUN'
     CLOUD = 'CLOUD'
-
 
 
 @dataclass
@@ -53,6 +58,7 @@ class ColumnMapping:
     targetColumn: str
     unitFactor: float = 1.0  # unit transformation factor
     extraMappings: List[ExtraCalculatedMapping] = field(default_factory=list)
+    dataPreprocessing: Optional[Callable[[DataFrame], DataFrame]] = None
 
 
 @dataclass
@@ -70,14 +76,14 @@ weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
             ColumnMapping(
                 sourceColumn="TT_TU",
                 targetColumn="t_air_degree_celsius",
-                extraMappings=[
-                    ExtraCalculatedMapping(
-                        targetColumn="day_avg_t_air_degree_celsius",
-                        calculate=lambda data, fac: (
-                                data.reshape(-1, 24).mean(axis=1).repeat(24) * fac
-                        )
-                    )
-                ]
+                # extraMappings=[
+                #     ExtraCalculatedMapping(
+                #         targetColumn="day_avg_t_air_degree_celsius",
+                #         calculate=lambda data, fac: (
+                #                 data.reshape(-1, 24).mean(axis=1).repeat(24) * fac
+                #         )
+                #     )
+                # ]
             )
         ]
     ),
@@ -85,15 +91,15 @@ weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
         fileUrlPath="solar/stundenwerte_ST_00691_row",
         dateTimeParser=lambda date: datetime.strptime(date.split(":")[0], "%Y%m%d%H"),
         columns=[
-            ColumnMapping("FD_LBERG", "dh_w_per_m2", JOULE_TO_WATT),
-            ColumnMapping("FG_LBERG", "gh_w_per_m2", JOULE_TO_WATT)
+            ColumnMapping("FD_LBERG", "dh_w_per_m2", JOULE_TO_WATT, dataPreprocessing=clip_to_zero),
+            ColumnMapping("FG_LBERG", "gh_w_per_m2", JOULE_TO_WATT, dataPreprocessing=clip_to_zero)
         ]
     ),
     WeatherDimension.WIND: WeatherDataSet(
         fileUrlPath="wind/historical/stundenwerte_FF_00691_19260101_20201231_hist",
         columns=[
-            ColumnMapping("   F", "wind_v_m_per_s"),
-            ColumnMapping("   D", "wind_dir_degree", 1)
+            ColumnMapping("   F", "wind_v_m_per_s", dataPreprocessing=clip_to_zero),
+            ColumnMapping("   D", "wind_dir_degree", 1, dataPreprocessing=clip_to_zero)
         ]
     ),
     # Length missmatch
@@ -140,6 +146,7 @@ class DWDWeatherDataImporter:
     def initialize(self):
         self.__download()
         self.__load()
+        # self.__preprocess()
 
     def __load(self):
         print(f'Loading and transforming data:')
@@ -161,8 +168,16 @@ class DWDWeatherDataImporter:
         #     data['gh_w_per_m2'],
         # ])
 
-    def __download(self):
+    def __preprocess(self):
+        for dimension in weatherDataSourcesMap.keys():
+            weather_data_set = weatherDataSourcesMap[dimension]
+            for column in weather_data_set.columns:
+                target = column.targetColumn
+                if column.dataPreprocessing is not None and self.data[target] is not None:
+                    processed_data = column.dataPreprocessing(self.data[target])
+                    self.data[target] = processed_data
 
+    def __download(self):
         # needed for export
         # if filename is None:
         #     filename = "WeatherBre2009-2019.hdf5"
@@ -205,8 +220,7 @@ class DWDWeatherDataImporter:
     def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
         return self.data.index.month.values, self.data.index.day.values, self.data.index.hour.values
 
+
 if __name__ == "__main__":
     importer = DWDWeatherDataImporter()
     importer.initialize()
-
-
