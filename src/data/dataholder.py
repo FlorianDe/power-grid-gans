@@ -35,7 +35,7 @@ class DataHolder:
 
 
 if __name__ == '__main__':
-    x =  numpy.array([
+    x = numpy.array([
         [0, 0, 0, 1],
         [0, 0, 1, 0],
         [0, 0, 1, 1]
@@ -58,4 +58,3 @@ if __name__ == '__main__':
     )
     for i, (real_data, labels) in enumerate(data_loader):
         print(f'{i}: {labels} -> {real_data}')
-

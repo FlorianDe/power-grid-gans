@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import StepLR, MultiStepLR, LambdaLR, CyclicLR, Ex
 
 from src.net import CustomModule
 
+
 @dataclass
 class TrainModel:
     model: CustomModule

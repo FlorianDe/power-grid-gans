@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from src.net.custom_module  import CustomModule
+from src.net.custom_module import CustomModule
 
 
 class FNN(CustomModule):
@@ -17,7 +17,7 @@ class FNN(CustomModule):
         hidden_layers.append(out_size)
         self.linear_layers = nn.ModuleList()
         for i in range(len(hidden_layers) - 1):
-            self.linear_layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
+            self.linear_layers.append(nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
 
     def forward(self, x: Tensor):
         for i in range(len(self.linear_layers)):

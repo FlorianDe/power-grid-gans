@@ -3,7 +3,6 @@ from typing import Union, Optional
 import numpy as np
 import torch.nn as nn
 import torch.optim
-
 from tensorboardX import SummaryWriter
 from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
@@ -229,14 +228,14 @@ if __name__ == '__main__':
     epochs = 10000
     noise_vector_size = 50
     # sequence_length = 24
-    batch_size = 24#*7
+    batch_size = 24  # *7
     features = data_holder.get_feature_size()
-    G_net = CGANBasicGenerator(input_size=noise_vector_size+14, out_size=features, hidden_layers=[200])
+    G_net = CGANBasicGenerator(input_size=noise_vector_size + 14, out_size=features, hidden_layers=[200])
     G_optim = torch.optim.Adam(G_net.parameters())
     G_sched = StepLR(G_optim, step_size=30, gamma=0.1)
     G = TrainModel(G_net, G_optim, G_sched)
 
-    D_net = CGANBasicDiscriminator(input_size=features+14, out_size=1, hidden_layers=[100, 50, 20])
+    D_net = CGANBasicDiscriminator(input_size=features + 14, out_size=1, hidden_layers=[100, 50, 20])
     D_optim = torch.optim.Adam(D_net.parameters())
     D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)

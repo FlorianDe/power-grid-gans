@@ -1,8 +1,9 @@
-import math
 from dataclasses import dataclass
+
+import math
 import torch.nn as nn
 
-from src.net.custom_module  import CustomModule
+from src.net.custom_module import CustomModule
 from src.net.dynamic.fnn import FNN
 
 
@@ -67,7 +68,7 @@ class ConvolutionalNet(CustomModule):
 
     @staticmethod
     def calc_conv_out(size_in, c: ConvData):
-        size_out = math.floor(1+(size_in + 2 * c.padding - c.dilation*(c.kernel_size - 1) - 1)/c.stride)
+        size_out = math.floor(1 + (size_in + 2 * c.padding - c.dilation * (c.kernel_size - 1) - 1) / c.stride)
         size_out = math.floor(size_out / c.pooling)
         return size_out
 

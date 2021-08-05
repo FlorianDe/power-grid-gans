@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt
-
 from typing import List
+
+import matplotlib.pyplot as plt
 from pandas import DataFrame
 
 

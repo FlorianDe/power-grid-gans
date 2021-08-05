@@ -127,7 +127,6 @@ class VanillaGANTrainer:
                     global_step=self.iter_no
                 )
 
-
     def train(self, max_epochs):
         self.__initialize_training()
 

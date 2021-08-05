@@ -1,7 +1,6 @@
 from typing import Optional
 
 import torch.nn as nn
-
 from torch import Tensor
 
 from src.net.dynamic import FNN
@@ -20,4 +19,3 @@ class BasicDiscriminator(FNN):
 
     def reshape(self, x):
         return x
-

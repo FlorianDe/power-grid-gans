@@ -36,6 +36,7 @@ class TensorboardUtils:
         '#FF69B4',
         '#8B4513',
     ]
+
     @staticmethod
     def plot_graph_as_figure(
             writer: SummaryWriter,
