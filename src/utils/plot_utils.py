@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from pandas import DataFrame
 
 
-def plot(data: List[DataFrame]):
+def plot_dfs(data: List[DataFrame]):
     temp_plot_options = {
         'figure.figsize': (20, 5),
         'figure.dpi': 300,

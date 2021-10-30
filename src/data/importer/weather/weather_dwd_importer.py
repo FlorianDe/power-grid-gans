@@ -23,6 +23,8 @@ from src.utils.path_utils import unzip, get_root_project_path
 # reciprocal). So the calculation we need to apply is
 # 1 / (3.6*1e^3) * 1 / 1e^-4 = 1e^4 / (3.6*1e^3) = 1e^1 / 3.6
 # which is equal to:
+from utils.plot_utils import plot_dfs
+
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
 DATE_COL_SOL = 8
@@ -102,7 +104,7 @@ weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
             ColumnMapping("   D", "wind_dir_degree", 1, dataPreprocessing=clip_to_zero)
         ]
     ),
-    # Length missmatch
+    # Length mismatch
     # WeatherDimension.CLOUD: WeatherDataSet(
     #     fileUrlPath="cloudiness/historical/stundenwerte_N_00691_19490101_20201231",
     #     columns=[
@@ -134,7 +136,7 @@ class DWDWeatherDataImporter:
             self.path = path
         self.start_date = start_date
         self.end_date = end_date
-        self.data = pd.DataFrame(
+        self.data: pd.DataFrame = pd.DataFrame(
             index=pd.date_range(
                 start=self.start_date,
                 end=self.end_date,
@@ -142,11 +144,12 @@ class DWDWeatherDataImporter:
                 freq="H",
             )
         )
+        self.__data_labels: list[str] = []
 
     def initialize(self):
         self.__download()
         self.__load()
-        # self.__preprocess()
+        self.__preprocess()
 
     def __load(self):
         print(f'Loading and transforming data:')
@@ -212,15 +215,25 @@ class DWDWeatherDataImporter:
 
         for column in weather_data_set.columns:
             print(f'{column.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')
-            self.data[column.targetColumn] = csv[column.sourceColumn].values * column.unitFactor
+            self._assign_column_data(column.targetColumn, csv[column.sourceColumn].values * column.unitFactor)
             for extraMapping in column.extraMappings:
                 print(f'--> calculated data: tar_mean_col: {extraMapping.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')
-                self.data[extraMapping.targetColumn] = extraMapping.calculate(csv[column.sourceColumn].values, column.unitFactor)
+                self._assign_column_data(extraMapping.targetColumn, extraMapping.calculate(csv[column.sourceColumn].values, column.unitFactor))
+
+    def _assign_column_data(self, target_column, values):
+        self.data[target_column] = values
+        self.__data_labels.append(target_column)
 
     def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+        if not isinstance(self.data.index, pd.DatetimeIndex):
+            raise ValueError("The index of the importer is no DatetimeIndex therefore it is not enforced to have a month, day and hour column!")
         return self.data.index.month.values, self.data.index.day.values, self.data.index.hour.values
+
+    def get_feature_labels(self):
+        return self.__data_labels
 
 
 if __name__ == "__main__":
     importer = DWDWeatherDataImporter()
     importer.initialize()
+    plot_dfs([importer.data])
