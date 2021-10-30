@@ -20,9 +20,9 @@ class FNN(CustomModule):
             self.linear_layers.append(nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
 
     def forward(self, x: Tensor):
-        for i in range(len(self.linear_layers)):
-            x = self.linear_layers[i](x)
-            if i < len(self.linear_layers) - 1:
+        for index, layer in enumerate(self.linear_layers):
+            x = layer(x)
+            if index < len(self.linear_layers) - 1:
                 x = F.relu(x)
                 x = F.dropout(x)
         return x
