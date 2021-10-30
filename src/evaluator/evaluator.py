@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.jit import ScriptModule
 from torch.nn import Module
 
-from constants import GENERATOR_MODEL_NAME, GENERATOR_NORMALIZER_NAME
+from constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME
 from data.normalization.base_normalizer import BaseNormalizer
 from utils.datetime_utils import dates_to_conditional_vectors, interval_generator
 
@@ -62,11 +62,11 @@ class Evaluator:
         if not p.is_dir() and p.is_file():
             p = p.parent
 
-        model_path = p / GENERATOR_MODEL_NAME
-        normalizer_path = p / GENERATOR_NORMALIZER_NAME
+        model_path = p / GENERATOR_MODEL_FILE_NAME
+        normalizer_path = p / GENERATOR_NORMALIZER_FILE_NAME
 
         if not model_path.exists():
-            raise ValueError(f"The path/file you've specified does not contain a valid model file called {GENERATOR_MODEL_NAME}!")
+            raise ValueError(f"The path/file you've specified does not contain a valid model file called {GENERATOR_MODEL_FILE_NAME}!")
 
         # model = torch.load(model_path.absolute())
         model = torch.jit.load(model_path.absolute())

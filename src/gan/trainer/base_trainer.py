@@ -5,8 +5,8 @@ from typing import Union
 
 import torch
 
-from src.constants import GENERATOR_MODEL_NAME, GENERATOR_NORMALIZER_NAME
-from src.data.dataholder import DataHolder
+from src.constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
+from src.data.data_holder import DataHolder
 from src.data.normalization.base_normalizer import BaseNormalizer
 from src.gan.trainer.trainer_types import TrainModel
 
@@ -36,8 +36,9 @@ class BaseTrainer:
         if not p.exists():
             p.mkdir(parents=True, exist_ok=True)
 
-        model_path = p / GENERATOR_MODEL_NAME
-        normalizer_path = p / GENERATOR_NORMALIZER_NAME
+        model_path = p / GENERATOR_MODEL_FILE_NAME
+        normalizer_path = p / GENERATOR_NORMALIZER_FILE_NAME
+        feature_labels_file = p / GENERATOR_FEATURE_LABELS_FILE_NAME # TODO WRITE TO CSV USING CsvSerializer class
 
         if model_path.exists():
             if overwrite is False:

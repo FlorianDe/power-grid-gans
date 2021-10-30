@@ -1,2 +1,3 @@
-GENERATOR_MODEL_NAME = "model.pt"
-GENERATOR_NORMALIZER_NAME = "normalizer.nrmlzr"
+GENERATOR_MODEL_FILE_NAME = "model.pt"
+GENERATOR_NORMALIZER_FILE_NAME = "normalizer.nrmlzr"
+GENERATOR_FEATURE_LABELS_FILE_NAME = "feature_labels.csv"

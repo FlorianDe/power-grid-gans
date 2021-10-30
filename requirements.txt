@@ -26,6 +26,8 @@ cryptography==3.4.7
     # via pandapower
 cycler==0.10.0
     # via matplotlib
+dataclass-csv===1.3.0
+    # via -r requirements.in
 decorator==4.4.2
     # via networkx
 et-xmlfile==1.1.0

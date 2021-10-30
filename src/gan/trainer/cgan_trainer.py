@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.gan.trainer.base_trainer import BaseTrainer
-from src.data.dataholder import DataHolder
+from src.data.data_holder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.trainer.trainer_types import TrainModel
 from src.net import CustomModule

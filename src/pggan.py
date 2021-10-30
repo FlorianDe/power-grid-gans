@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 
 from evaluator.evaluator import Evaluator
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
-from src.data.dataholder import DataHolder
+from src.data.data_holder import DataHolder
 from src.gan.trainer.cgan_trainer import CGANBasicGenerator, CGANBasicDiscriminator, CGANTrainer
 from src.gan.trainer.trainer_types import TrainModel
 from src.utils.args_utils import DataclassArgumentParser, Choice, Int, Arg, Str, Float
