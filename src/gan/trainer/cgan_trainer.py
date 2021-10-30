@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
+from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.dataholder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.trainer.trainer_types import TrainModel
@@ -18,8 +19,10 @@ from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 
 
 # torch.autograd.set_detect_anomaly(True)
+from src.utils.path_utils import get_root_project_path
 
-class CGANTrainer:
+
+class CGANTrainer(BaseTrainer):
     def __init__(self,
                  generator: TrainModel,
                  discriminator: TrainModel,
@@ -28,13 +31,14 @@ class CGANTrainer:
                  batch_size: int = 10,
                  device: Union[torch.device, int, str] = 'cpu'
                  ) -> None:
-        super().__init__()
-        self.generator = generator
-        self.discriminator = discriminator
+        super().__init__(
+            generator=generator,
+            discriminator=discriminator,
+            data_holder=data_holder,
+            device=device
+        )
         self.noise_vector_size = noise_vector_size
         self.batch_size = batch_size
-        self.device = device
-        self.data_holder = data_holder
 
         print("Dataset Size:", self.data_holder.data.shape)
         print("Labels Size:", self.data_holder.x.shape)
@@ -74,10 +78,10 @@ class CGANTrainer:
         self.discriminator.model.train()
         self.generator.model.train()
 
-    def __write_training_stats(self, real_data: Tensor, real_labels: Tensor):
+    def __write_training_stats(self, epoch: int, real_data: Tensor, real_labels: Tensor):
         with torch.no_grad():
             if self.iter_no % 500 == 0:
-                print(f'Iter {self.iter_no}: gen_loss={np.mean(self.gen_losses)}, dis_loss={np.mean(self.dis_losses)}')
+                print(f'{epoch}. Epoch: Iter {self.iter_no}: gen_loss={np.mean(self.gen_losses)}, dis_loss={np.mean(self.dis_losses)}')
                 self.writer.add_scalar("gen_loss", np.mean(self.gen_losses), self.iter_no)
                 self.writer.add_scalar("dis_loss", np.mean(self.dis_losses), self.iter_no)
                 self.__reset_running_calculations()
@@ -123,7 +127,10 @@ class CGANTrainer:
                 self.generator.optimizer.zero_grad()
 
                 # Sample noise and labels as generator input
-                z = torch.from_numpy(np.random.normal(0, 1, (self.batch_size, self.noise_vector_size)).astype(dtype=np.float32))
+                # multiple random noise vectors
+                # z = torch.from_numpy(np.random.normal(0, 1, (self.batch_size, self.noise_vector_size)).astype(dtype=np.float32))
+                # same noise vector batch-times
+                z = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)), self.batch_size, axis=0).astype(dtype=np.float32))
 
                 # TODO Generation should check for invalid days for specific month like 31.02 => isn't valid
                 months = np.random.randint(1, 12, self.batch_size)
@@ -161,7 +168,7 @@ class CGANTrainer:
                 self.dis_losses.append(d_loss.item())
 
                 self.iter_no += 1
-                self.__write_training_stats(real_data, labels)
+                self.__write_training_stats(epoch, real_data, labels)
 
 
 class CGANRNNGenerator(CustomModule):
@@ -225,7 +232,7 @@ if __name__ == '__main__':
     data_importer = DWDWeatherDataImporter()
     data_importer.initialize()
     data_holder = DataHolder(data_importer.data.values.astype(np.float32), np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())))
-    epochs = 10000
+    epochs = 10
     noise_vector_size = 50
     # sequence_length = 24
     batch_size = 24  # *7
@@ -240,7 +247,11 @@ if __name__ == '__main__':
     D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)
 
-    CGANTrainer(G, D, data_holder, noise_vector_size, batch_size, 'cpu').train(epochs)
+    trainer = CGANTrainer(G, D, data_holder, noise_vector_size, batch_size, 'cpu')
+    trainer.train(epochs)
+
+    path = get_root_project_path().joinpath('runs').joinpath('model-test').absolute()
+    trainer.save_model(path)
 
     # # [batch, sequence, features]
     # b1 = np.array([

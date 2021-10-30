@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
+from data.dataholder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.discriminator.basic_discriminator import BasicDiscriminator
 from src.gan.generator.basic_generator import BasicGenerator
@@ -20,6 +21,7 @@ class VanillaGANTrainer:
             self,
             generator: TrainModel,
             discriminator: TrainModel,
+            data_holder: DataHolder,
             noise_vector_size: int,
             sequence_length: int,
             batch_size: int = 10,
@@ -28,19 +30,19 @@ class VanillaGANTrainer:
         super().__init__()
         self.generator = generator
         self.discriminator = discriminator
+        self.data_holder = data_holder
         self.noise_vector_size = noise_vector_size
         self.sequence_length = sequence_length
         self.batch_size = batch_size
+        self.features = features
         self.device = device
-        self.data_importer = DWDWeatherDataImporter()
-        self.data_importer.initialize()
-        # This part could be refactored to use some kind of custom dataloader!
-        self.data = self.data_importer.data.values.astype(np.float32)
-        if len(self.data) % sequence_length != 0:
+
+        print("Dataset Size:", self.data_holder.data.shape)
+        if len(self.data_holder.data) % sequence_length != 0:
             raise ValueError(
-                f'Cannot use a sequence length of {sequence_length} since the data set inside properly dividable {len(self.data) % sequence_length=}')
-        data = self.data.reshape(-1, 24, 6)
-        print("Dataset Size:", self.data.shape)
+                f'Cannot use a sequence length of {sequence_length} since the data set inside properly dividable {len(self.data_holder.data) % sequence_length=}')
+
+        data = self.data_holder.data.reshape(-1, self.sequence_length, self.data_holder.get_feature_size())
         print("Data Size:", data.shape)
         self.data_loader = DataLoader(
             TensorDataset(torch.from_numpy(data)),
@@ -142,11 +144,14 @@ class VanillaGANTrainer:
 
 
 if __name__ == '__main__':
+    data_importer = DWDWeatherDataImporter()
+    data_importer.initialize()
+    data_holder = DataHolder(data_importer.data.values.astype(np.float32), data_importer.get_feature_labels())
     epochs = 10000
     noise_vector_size = 50
     sequence_length = 24
     batch_size = 10  # 24
-    features = 6
+    features = 5
     G_net = BasicGenerator(input_size=noise_vector_size, out_size=sequence_length * features, hidden_layers=[200, 300, 150])
     G_optim = torch.optim.Adam(G_net.parameters())
     G_sched = StepLR(G_optim, step_size=30, gamma=0.1)
@@ -157,4 +162,4 @@ if __name__ == '__main__':
     D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)
 
-    VanillaGANTrainer(G, D, noise_vector_size, sequence_length, batch_size, 'cpu').train(epochs)
+    VanillaGANTrainer(G, D, data_holder, noise_vector_size, sequence_length, batch_size, 'cpu').train(epochs)
