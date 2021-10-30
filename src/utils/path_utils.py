@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -24,9 +23,18 @@ def get_root_project_path() -> Path:
 
 
 def unzip(path: str, zip_file_name: str, target: str):
-    with ZipFile(os.path.join(path, zip_file_name), "r") as zip_ref:
-        zip_ref.extractall(os.path.join(path, target))
+    p = Path(path)
+    zip_file_path = p / zip_file_name
+    if not zip_file_path.exists():
+        raise ValueError("The .zip file you`ve specified does exist!")
+
+    target_path = p / target
+    if not target_path.is_dir():
+        raise ValueError("The specified extraction path is not a directory!")
+
+    with ZipFile(zip_file_path.absolute(), "r") as zip_ref:
+        zip_ref.extractall(target_path.absolute())
 
 
 if __name__ == '__main__':
-    get_root_project_path()
+    print(f'{get_root_project_path() = }')
