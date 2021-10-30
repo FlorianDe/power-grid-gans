@@ -1,11 +1,9 @@
-import tempfile
 import unittest
 
 import numpy
 
-from src.data.normalization.base_normalizer import BaseNormalizer
-from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
-from test.data.normalization.test_base_normalizer import test_serialization_helper, test_is_fitted_helper
+from src.data.normalization.np import StandardNumpyNormalizer
+from test.data.normalization._test_base_normalizer import _test_serialization_helper, _test_is_fitted_helper
 
 
 class TestStandardNumpyNormalizer(unittest.TestCase):
@@ -20,11 +18,11 @@ class TestStandardNumpyNormalizer(unittest.TestCase):
         self.normalizer = StandardNumpyNormalizer()
 
     def test_init(self):
-        test_is_fitted_helper(self, self.normalizer, False)
+        _test_is_fitted_helper(self, self.normalizer, False)
 
     def test_fit_data(self):
         self.normalizer.fit(self.data)
-        test_is_fitted_helper(self, self.normalizer, True)
+        _test_is_fitted_helper(self, self.normalizer, True)
         self.assertTrue(numpy.allclose(self.normalizer.mu, [2.5, 453.5]))
         self.assertTrue(numpy.allclose(self.normalizer.sigma, [1.1180339887499, 300.34355328523]))
 
@@ -39,7 +37,7 @@ class TestStandardNumpyNormalizerSerializability(unittest.TestCase):
         self.normalizer = StandardNumpyNormalizer()
 
     def test_serialization(self):
-        loaded_normalizer = test_serialization_helper(self, self.normalizer, self.data)
+        loaded_normalizer = _test_serialization_helper(self, self.normalizer, self.data)
         assert isinstance(loaded_normalizer, StandardNumpyNormalizer)
 
         self.assertTrue(numpy.allclose(self.normalizer.sigma, loaded_normalizer.sigma))

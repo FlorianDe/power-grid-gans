@@ -3,7 +3,7 @@ import unittest
 import numpy
 
 from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
-from test.data.normalization.test_base_normalizer import test_is_fitted_helper, test_serialization_helper
+from test.data.normalization._test_base_normalizer import _test_is_fitted_helper, _test_serialization_helper
 
 
 class TestMinMaxNumpyNormalizer(unittest.TestCase):
@@ -18,11 +18,11 @@ class TestMinMaxNumpyNormalizer(unittest.TestCase):
         self.normalizer = MinMaxNumpyNormalizer()
 
     def test_init(self):
-        test_is_fitted_helper(self, self.normalizer, False)
+        _test_is_fitted_helper(self, self.normalizer, False)
 
     def test_fit_data(self):
         self.normalizer.fit(self.data)
-        test_is_fitted_helper(self, self.normalizer, True)
+        _test_is_fitted_helper(self, self.normalizer, True)
         self.assertTrue(numpy.allclose(self.normalizer.min, [1, 123]))
         self.assertTrue(numpy.allclose(self.normalizer.max, [4, 890]))
 
@@ -37,7 +37,7 @@ class TestMinMaxNumpyNormalizerSerializability(unittest.TestCase):
         self.normalizer = MinMaxNumpyNormalizer()
 
     def test_serialization(self):
-        loaded_normalizer = test_serialization_helper(self, self.normalizer, self.data)
+        loaded_normalizer = _test_serialization_helper(self, self.normalizer, self.data)
         assert isinstance(loaded_normalizer, MinMaxNumpyNormalizer)
 
         self.assertTrue(numpy.allclose(self.normalizer.min, loaded_normalizer.min))
