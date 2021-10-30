@@ -13,3 +13,6 @@ atari-py
 opencv-python==4.4.0.46
 pandapower===2.6.0
 pytest===6.2.4
+scikit-learn===0.24.2
+statsmodels===0.12.2
+argparse===1.4.0
