@@ -107,15 +107,6 @@ if __name__ == '__main__':
         generated_data = evaluator.generate(start, end).numpy().transpose()
 
         print(f"{generated_data.shape=}")
-
-        # TODO ADD CHECKS FOR UNSIZED COLUMN MAPPINGS AND RETRIEVED FEATURES
-        column_feature_mappings = [
-            't_air_degree_celsius',
-            'dh_w_per_m2',
-            'gh_w_per_m2',
-            'wind_v_m_per_s',
-            'wind_dir_degree',
-        ]
         data = pd.DataFrame(
             index=pd.date_range(
                 start=datetime(start.year, start.month, start.day),
@@ -125,7 +116,7 @@ if __name__ == '__main__':
             )
         )
         for i in range(generated_data.shape[0]):
-            data[column_feature_mappings[i]] = generated_data[i]
+            data[evaluator.feature_labels[i].label] = generated_data[i]
 
         plot_dfs([data])
 

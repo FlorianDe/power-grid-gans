@@ -1,4 +1,5 @@
-from typing import TypeVar, Type
+from pathlib import Path
+from typing import TypeVar, Type, Union
 
 from dataclass_csv import DataclassReader, DataclassWriter
 
@@ -7,13 +8,13 @@ T = TypeVar("T")
 
 class CsvSerializer:
     @staticmethod
-    def save(data: list[T], filename: str, cls: Type[T]):
+    def save(filename: Union[str, Path], data: list[T], cls: Type[T]):
         with open(filename, 'w') as output_file:
             w = DataclassWriter(output_file, data, cls)
             w.write()
 
     @staticmethod
-    def load(filename: str, cls: Type[T]) -> list[T]:
+    def load(filename: Union[str, Path], cls: Type[T]) -> list[T]:
         res: list[T] = []
         with open(filename, 'r') as input_file:
             reader = DataclassReader(input_file, cls)

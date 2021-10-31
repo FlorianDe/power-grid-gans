@@ -11,8 +11,10 @@ from torch import Tensor
 from torch.jit import ScriptModule
 from torch.nn import Module
 
-from constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME
+from constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
 from data.normalization.base_normalizer import BaseNormalizer
+from data.serializer.csv_serializer import CsvSerializer
+from data.types import Feature
 from utils.datetime_utils import dates_to_conditional_vectors, interval_generator
 
 from utils.path_utils import get_root_project_path
@@ -20,9 +22,10 @@ from utils.path_utils import get_root_project_path
 
 class Evaluator:
 
-    def __init__(self, model: ScriptModule | Module, normalizer: Optional[BaseNormalizer] = None) -> None:
+    def __init__(self, model: ScriptModule | Module, feature_labels: list[Feature], normalizer: Optional[BaseNormalizer] = None) -> None:
         super().__init__()
         self.model: ScriptModule = model
+        self.feature_labels = feature_labels
         self.normalizer = normalizer
 
         self.model.eval()  # Set the model to "eval" mode, alias for model.train(mode=False)
@@ -52,7 +55,6 @@ class Evaluator:
                     result = torch.cat((result, current_res))
             return result
 
-
     @staticmethod
     def load(path: Union[str, Path]) -> Evaluator:
         p = Path(path) if isinstance(path, str) else path
@@ -64,18 +66,21 @@ class Evaluator:
 
         model_path = p / GENERATOR_MODEL_FILE_NAME
         normalizer_path = p / GENERATOR_NORMALIZER_FILE_NAME
+        feature_labels_file_path = p / GENERATOR_FEATURE_LABELS_FILE_NAME
 
         if not model_path.exists():
             raise ValueError(f"The path/file you've specified does not contain a valid model file called {GENERATOR_MODEL_FILE_NAME}!")
 
         # model = torch.load(model_path.absolute())
         model = torch.jit.load(model_path.absolute())
-        normalizer = None
 
+        feature_labels = CsvSerializer.load(feature_labels_file_path, Feature)
+
+        normalizer = None
         if normalizer_path.exists():
             normalizer = BaseNormalizer.load(normalizer_path.absolute())
 
-        return Evaluator(model, normalizer)
+        return Evaluator(model, feature_labels, normalizer)
 
 
 if __name__ == '__main__':

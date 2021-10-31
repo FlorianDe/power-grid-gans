@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from utils.datetime_utils import convert_input_str_to_date, interval_generator
+from utils.datetime_utils import convert_input_str_to_date, interval_generator, format_timestamp
 
 
 class TestIntervalGenerator(unittest.TestCase):
@@ -30,3 +30,10 @@ class TestIntervalGenerator(unittest.TestCase):
 
     def test_interval_generator_with_start_older_than_start(self):
         self.assertEqual(0, sum(1 for _ in interval_generator(date(2022, 1, 1), date(2021, 1, 1))))
+
+    def test_format_timestamp(self):
+        ts_ns = 1635694638531000000  # corresponds to 2021-10-31 16:37:18.531000064
+        ts_ns_as_str = "2021_10_31_16_37_18_531000064"
+        formatted_ts = format_timestamp(ts_ns)
+
+        self.assertEqual(formatted_ts, ts_ns_as_str)

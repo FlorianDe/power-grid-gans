@@ -1,18 +1,20 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy
 import numpy.typing as npt
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import TensorDataset
 
+from data.types import Feature
 from src.data.normalization import BaseNormalizer, NoneNormalizer
+from utils.type_utils import check_list_type
 
 
 class DataHolder:
     def __init__(self,
                  data: npt.ArrayLike,
-                 data_labels: Optional[list[str]] = None,
-                 dates: Optional[numpy.array] = None,
+                 data_labels: Optional[Union[list[Feature], list[str]]] = None,
+                 dates: Optional[npt.ArrayLike] = None,
                  normalizer_constructor: Optional[type(BaseNormalizer)] = None
                  ) -> None:
         super().__init__()
@@ -21,8 +23,12 @@ class DataHolder:
 
         data_feature_size = data.shape[-1]
         if data_labels is None:
-            data_labels = [f"Feature {f}" for f in range(data_feature_size)]
+            data_labels = [Feature(f"Feature {f}") for f in range(data_feature_size)]
+        elif check_list_type(data_labels, str):
+            data_labels = [Feature(label, label) for label in data_labels]
 
+        if not check_list_type(data_labels, Feature):
+            raise ValueError(f"You have passed in some kind of mixed type feature labels array which is not suitable, {data_labels=}.")
         if data_feature_size != len(data_labels):
             raise ValueError(f"The feature labels for the data do not match in size. {data_feature_size=} and {data_labels=}")
 
