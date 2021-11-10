@@ -12,5 +12,3 @@ class TrainModel:
     model: CustomModule
     optimizer: Optimizer
     scheduler: Optional[Union[StepLR, MultiStepLR, LambdaLR, CyclicLR, ExponentialLR, CosineAnnealingLR, CosineAnnealingWarmRestarts, ReduceLROnPlateau]]
-
-

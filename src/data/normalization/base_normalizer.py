@@ -45,5 +45,3 @@ class BaseNormalizer(Generic[T]):
 
     def __str__(self) -> str:
         return f'Instance of {self.__module__}.{self.__class__.__name__} with state: {json.dumps(self.__dict__, indent=4, sort_keys=True, default=str)}'
-
-

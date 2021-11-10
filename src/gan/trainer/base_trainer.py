@@ -22,7 +22,7 @@ class BaseTrainer:
                  discriminator: TrainModel,
                  data_holder: DataHolder,
                  device: Union[torch.device, int, str] = 'cpu'
-    ) -> None:
+                 ) -> None:
         super().__init__()
         self.generator = generator
         self.discriminator = discriminator
@@ -73,8 +73,3 @@ class BaseTrainer:
         if self.data_holder.normalizer is not None:
             BaseNormalizer.save(self.data_holder.normalizer, normalizer_file_path.absolute())
             print(f"Saved the corresponding normalizer model under: {normalizer_file_path}")
-
-
-
-
-

@@ -5,7 +5,6 @@ from typing import Type, TypeVar, Generic
 
 ContainerType = TypeVar('ContainerType')
 
-
 """
 Custom Args Parser. Implementation was derived from the following source:
 https://gist.github.com/dmitriy-serdyuk/bd434258e90697bafc5969a06083af73
@@ -75,5 +74,3 @@ class DataclassArgumentParser(Generic[ContainerType]):
 
         arg_dict = self.parser.parse_args(**kwargs)
         return self.container_class(**vars(arg_dict))
-
-    

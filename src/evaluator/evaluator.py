@@ -99,9 +99,9 @@ if __name__ == '__main__':
     noises = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, noise_vector_size)), batch_size, axis=0).astype(dtype=np.float32))
 
     # Generate a batch for the Date a 01.01. between 0 and 23 o'clock
-    months = np.repeat(1, batch_size) # np.random.randint(1, 12, batch_size)
-    days = np.repeat(1, batch_size) # np.random.randint(1, 31, batch_size)
-    hours = np.arange(24) # np.random.randint(0, 23, batch_size)
+    months = np.repeat(1, batch_size)  # np.random.randint(1, 12, batch_size)
+    days = np.repeat(1, batch_size)  # np.random.randint(1, 31, batch_size)
+    hours = np.arange(24)  # np.random.randint(0, 23, batch_size)
     conditions = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
 
     y = evaluator.model(noises, conditions)

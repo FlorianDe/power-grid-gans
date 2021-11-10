@@ -21,4 +21,3 @@ class CsvSerializer:
             for row in reader:
                 res.append(row)
         return res
-
