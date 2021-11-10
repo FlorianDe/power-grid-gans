@@ -52,23 +52,32 @@ joblib==1.0.1
     # via scikit-learn
 kiwisolver==1.3.1
     # via matplotlib
+llvmlite==0.37.0
+    # via numba
 markdown==3.3.4
     # via tensorboard
 matplotlib===3.4.2
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   seaborn
 networkx==2.5.1
     # via pandapower
+numba==0.54.1
+    # via sktime
 numpy==1.20.3
     # via
     #   atari-py
     #   gym
     #   matplotlib
+    #   numba
     #   opencv-python
     #   pandapower
     #   pandas
     #   patsy
     #   scikit-learn
     #   scipy
+    #   seaborn
+    #   sktime
     #   statsmodels
     #   tensorboard
     #   tensorboardx
@@ -90,6 +99,8 @@ pandas===1.2.4
     # via
     #   -r requirements.in
     #   pandapower
+    #   seaborn
+    #   sktime
     #   statsmodels
 patsy==0.5.1
     # via statsmodels
@@ -136,13 +147,18 @@ requests==2.25.1
 rsa==4.7.2
     # via google-auth
 scikit-learn===0.24.2
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   sktime
 scipy==1.6.0
     # via
     #   gym
     #   pandapower
     #   scikit-learn
+    #   seaborn
     #   statsmodels
+seaborn===0.11.2
+    # via -r requirements.in
 six==1.16.0
     # via
     #   absl-py
@@ -153,8 +169,12 @@ six==1.16.0
     #   patsy
     #   protobuf
     #   python-dateutil
-statsmodels===0.12.2
+sktime===0.8.1
     # via -r requirements.in
+statsmodels===0.12.2
+    # via
+    #   -r requirements.in
+    #   sktime
 tensorboard-data-server==0.6.1
     # via tensorboard
 tensorboard-plugin-wit==1.8.0
@@ -189,7 +209,9 @@ werkzeug==2.0.0
 wget===3.2
     # via -r requirements.in
 wheel==0.36.2
-    # via tensorboard
+    # via
+    #   sktime
+    #   tensorboard
 xlrd==2.0.1
     # via pandapower
 xlsxwriter==1.4.3
