@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
-import numpy
+import numpy as np
 import numpy.typing as npt
 import torch
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, SubsetRandomSampler
 
 from data.types import Feature
 from src.data.normalization import BaseNormalizer, NoneNormalizer
@@ -36,7 +36,7 @@ class DataHolder:
             raise ValueError("If you are passing corresponding time values x, they have to be of the same length as the passed data")
 
         if dates is None:
-            dates = numpy.fromiter(range(len(data)), dtype="float32")
+            dates = np.fromiter(range(len(data)), dtype="float32")
 
         if normalizer_constructor is None:
             normalizer_constructor = NoneNormalizer
@@ -54,3 +54,20 @@ class DataHolder:
 
     def get_feature_labels(self):
         return self.data_labels
+
+    @staticmethod
+    def create_dataset_sampler(dataset: TensorDataset, validation_split: float = .8, shuffle_dataset: bool = False, random_seed: int = 42):
+        # Creating samplers for training and validation splits:
+        dataset_size = len(dataset)
+        indices = list(range(dataset_size))
+        split = int(np.floor(dataset_size * validation_split))
+
+        if shuffle_dataset:
+            np.random.seed(random_seed)
+            np.random.shuffle(indices)
+        train_indices, val_indices = indices[:split], indices[split:]
+
+        train_sampler = SubsetRandomSampler(train_indices)
+        valid_sampler = SubsetRandomSampler(val_indices)
+
+        return train_sampler, valid_sampler

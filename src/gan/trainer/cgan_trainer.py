@@ -6,8 +6,9 @@ import torch.optim
 from tensorboardX import SummaryWriter
 from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 
+from metrics.forecast_performance import mase
 from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.data_holder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
@@ -16,11 +17,9 @@ from src.net import CustomModule
 from src.net.dynamic import FNN
 from src.utils.datetime_utils import dates_to_conditional_vectors
 from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
-
-
-# torch.autograd.set_detect_anomaly(True)
 from src.utils.path_utils import get_root_project_path
 
+# torch.autograd.set_detect_anomaly(True)
 
 class CGANTrainer(BaseTrainer):
     def __init__(self,
@@ -43,11 +42,21 @@ class CGANTrainer(BaseTrainer):
         print("Dataset Size:", self.data_holder.data.shape)
         print("Labels Size:", self.data_holder.x.shape)
 
-        self.data_loader = DataLoader(
-            TensorDataset(torch.from_numpy(self.data_holder.data), torch.from_numpy(self.data_holder.x)),
+        dataset = data_holder.get_tensor_dataset()  # TensorDataset(torch.from_numpy(self.data_holder.data), torch.from_numpy(self.data_holder.x))
+        train_data_sampler, validation_data_sampler = DataHolder.create_dataset_sampler(dataset)
+        self.train_data_loader = DataLoader(
+            dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            drop_last=True
+            drop_last=True,
+            sampler=train_data_sampler
+        )
+        self.validation_data_loader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=True,
+            sampler=validation_data_sampler
         )
         self.objective = nn.BCELoss()  # TODO REPLACE WITH CUSTOM LOSS FUNCTIONS!
         self.real_labels = torch.ones(self.batch_size, requires_grad=False, device=self.device)
@@ -118,7 +127,7 @@ class CGANTrainer(BaseTrainer):
 
     def train(self, max_epochs):
         for epoch in range(max_epochs):
-            for i, (real_data, labels) in enumerate(self.data_loader):
+            for i, (real_data, labels) in enumerate(self.train_data_loader):
                 # Configure input
                 # real_data = data[0].view(self.batch_size, -1)
                 # real_labels = Variable(labels.type(LongTensor))
@@ -169,6 +178,24 @@ class CGANTrainer(BaseTrainer):
 
                 self.iter_no += 1
                 self.__write_training_stats(epoch, real_data, labels)
+
+            # validation step
+            generated_test_data: Union[torch.Tensor, None] = None
+            for i, (real_data, labels) in enumerate(self.validation_data_loader):
+                with torch.no_grad():
+                    z = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)), self.batch_size, axis=0).astype(dtype=np.float32))
+                    current_res = self.generator.model(z, labels)
+                    if generated_test_data is None:
+                        generated_test_data = current_res
+                    else:
+                        generated_test_data = torch.cat((generated_test_data, current_res))
+            # TODO wtf am i doing here
+            mase_res = mase(
+                generated_test_data.detach().numpy(),
+                self.validation_data_loader.dataset[self.validation_data_loader.sampler.indices][0].detach().numpy()[:len(generated_test_data)],
+                self.train_data_loader.dataset[self.train_data_loader.sampler.indices][0].detach().numpy(),
+            )
+            print(f"=> {epoch}. Epoch: {mase_res=}")
 
 
 class CGANRNNGenerator(CustomModule):
