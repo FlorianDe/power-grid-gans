@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, Final
 
 import numpy
 import pandas as pd
@@ -24,6 +24,7 @@ from src.utils.path_utils import unzip, get_root_project_path
 # 1 / (3.6*1e^3) * 1 / 1e^-4 = 1e^4 / (3.6*1e^3) = 1e^1 / 3.6
 # which is equal to:
 from utils.plot_utils import plot_dfs
+from utils.python_ext import FinalClass
 
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
@@ -71,13 +72,23 @@ class WeatherDataSet:
     dateTimeParser: Callable[[str], datetime] = lambda date: datetime.strptime(date, "%Y%m%d%H")
 
 
+class WeatherDataColumns(metaclass=FinalClass):
+    T_AIR_DEGREE_CELSIUS: Final[str] = "t_air_degree_celsius"
+    DH_W_PER_M2: Final[str] = "dh_w_per_m2"
+    GH_W_PER_M2: Final[str] = "gh_w_per_m2"
+    WIND_V_M_PER_S: Final[str] = "wind_v_m_per_s"
+    WIND_DIR_DEGREE: Final[str] = "wind_dir_degree"
+    CLOUD_PERCENT: Final[str] = "cloud_percent"
+    SUN_HOURS_MIN_PER_H: Final[str] = "sun_hours_min_per_h"
+
+
 weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
     WeatherDimension.AIR: WeatherDataSet(
         fileUrlPath="air_temperature/historical/stundenwerte_TU_00691_19490101_20201231_hist",
         columns=[
             ColumnMapping(
                 sourceColumn="TT_TU",
-                targetColumn="t_air_degree_celsius",
+                targetColumn=WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
                 # extraMappings=[
                 #     ExtraCalculatedMapping(
                 #         targetColumn="day_avg_t_air_degree_celsius",
@@ -93,31 +104,30 @@ weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
         fileUrlPath="solar/stundenwerte_ST_00691_row",
         dateTimeParser=lambda date: datetime.strptime(date.split(":")[0], "%Y%m%d%H"),
         columns=[
-            ColumnMapping("FD_LBERG", "dh_w_per_m2", JOULE_TO_WATT, dataPreprocessing=clip_to_zero),
-            ColumnMapping("FG_LBERG", "gh_w_per_m2", JOULE_TO_WATT, dataPreprocessing=clip_to_zero)
+            ColumnMapping("FD_LBERG", WeatherDataColumns.DH_W_PER_M2, JOULE_TO_WATT, dataPreprocessing=clip_to_zero),
+            ColumnMapping("FG_LBERG", WeatherDataColumns.GH_W_PER_M2, JOULE_TO_WATT, dataPreprocessing=clip_to_zero)
         ]
     ),
     WeatherDimension.WIND: WeatherDataSet(
         fileUrlPath="wind/historical/stundenwerte_FF_00691_19260101_20201231_hist",
         columns=[
-            ColumnMapping("   F", "wind_v_m_per_s", dataPreprocessing=clip_to_zero),
-            ColumnMapping("   D", "wind_dir_degree", 1, dataPreprocessing=clip_to_zero)
+            ColumnMapping("   F", WeatherDataColumns.WIND_V_M_PER_S, dataPreprocessing=clip_to_zero),
+            ColumnMapping("   D", WeatherDataColumns.WIND_DIR_DEGREE, 1, dataPreprocessing=clip_to_zero)  # TODO CREATE RELATIVIZATION FIRST
         ]
     ),
     # Length mismatch
     # WeatherDimension.CLOUD: WeatherDataSet(
     #     fileUrlPath="cloudiness/historical/stundenwerte_N_00691_19490101_20201231",
     #     columns=[
-    #         ColumnMapping(" V_N", "cloud_percent", 12.5),
+    #         ColumnMapping(" V_N", WeatherDataColumns.CLOUD_PERCENT, 12.5),
     #     ]
     # ),
     # WeatherDimension.SUN: WeatherDataSet(
     #     fileUrlPath="sun/historical/stundenwerte_SD_00691_19510101_20201231_hist",
     #     columns=[
-    #         ColumnMapping("SD_SO", "sun_hours_min_per_h"),
+    #         ColumnMapping("SD_SO", WeatherDataColumns.SUN_HOURS_MIN_PER_H),
     #     ]
     # ),
-
 }
 
 
