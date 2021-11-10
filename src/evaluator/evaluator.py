@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
 from pathlib import Path
 
@@ -21,12 +22,11 @@ from utils.path_utils import get_root_project_path
 
 
 class Evaluator:
-
     def __init__(self, model: ScriptModule | Module, feature_labels: list[Feature], normalizer: Optional[BaseNormalizer] = None) -> None:
         super().__init__()
-        self.model: ScriptModule = model
-        self.feature_labels = feature_labels
-        self.normalizer = normalizer
+        self.model = deepcopy(model)
+        self.feature_labels = deepcopy(feature_labels)
+        self.normalizer = deepcopy(normalizer)
 
         self.model.eval()  # Set the model to "eval" mode, alias for model.train(mode=False)
 

@@ -17,7 +17,7 @@ def __decompose_sine(seed: int = 0) -> DecomposeResult:
     return seasonal_decompose(df, model='additive', period=365)
 
 
-def __decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> DecomposeResult:
+def decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> DecomposeResult:
     """
     Apply an additive time series decomposition on
 
@@ -43,9 +43,9 @@ if __name__ == '__main__':
     data = importer.data['t_air_degree_celsius']
 
     # difference between leap day and without
-    __decompose_weather_data(data, 24 * 365).plot()
+    # decompose_weather_data(data, 24 * 365).plot()
 
     for idx, key in enumerate(importer.data.keys()):
-        __decompose_weather_data(importer.data[key]).plot()
+        decompose_weather_data(importer.data[key]).plot()
 
     pyplot.show()

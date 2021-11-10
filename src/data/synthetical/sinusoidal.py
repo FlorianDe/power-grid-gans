@@ -68,7 +68,7 @@ def generate_sinusoidal_time_series(sample_count: int,
             temp_series_dimensions.append(temp_data)
             params_used_in_dimension.append(trig_params)
 
-        # Align row/column
+        # Transpose the temporary time series with its dimensions so we can append it to the final result list
         arr_temp = np.asarray(temp_series_dimensions)
         t_temp = np.transpose(arr_temp)
 

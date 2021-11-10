@@ -9,6 +9,7 @@ import torch
 from torch.optim.lr_scheduler import StepLR
 
 from evaluator.evaluator import Evaluator
+from metrics.timeseries_decomposition import decompose_weather_data
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.data.data_holder import DataHolder
 from src.gan.trainer.cgan_trainer import CGANBasicGenerator, CGANBasicDiscriminator, CGANTrainer
@@ -42,7 +43,7 @@ class PGGANArgs:
     mode: Choice[Mode] = Mode.TRAIN
     batch_size: Int(help="Number of batches") = 24
     noise_vector_size: Int(help="Size of the noise vector") = 50
-    epochs: Int = 5
+    epochs: Int = 100
     lr: Float(help="Learning rate for optimizers") = 0.003
     beta1: Float(help="Beta1 hyperparameter for the Adam optimizers") = 0.9
     device: Arg(type=torch.device) = torch.device('cpu')
@@ -59,7 +60,8 @@ def get_data_holder(dataset: Choice[Datasets]) -> DataHolder:
     if dataset is Datasets.WEATHER:
         data_importer = DWDWeatherDataImporter()
         data_importer.initialize()
-        return DataHolder(data_importer.data.values.astype(np.float32), data_importer.get_feature_labels(), np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())))
+        return DataHolder(data_importer.data.values.astype(np.float32), data_importer.get_feature_labels(),
+                          np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())))
     else:
         raise ValueError("Not supported yet!")
 
@@ -117,9 +119,9 @@ if __name__ == '__main__':
         )
         for i in range(generated_data.shape[0]):
             data[evaluator.feature_labels[i].label] = generated_data[i]
+            decompose_weather_data(data[evaluator.feature_labels[i].label]).plot()
 
         plot_dfs([data])
 
     else:
         raise ValueError(f"Mode: {args.mode} is not supported.")
-
