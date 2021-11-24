@@ -1,7 +1,23 @@
-from typing import List
+import sys
+import numpy.typing as npt
+from collections import namedtuple
+from typing import List, Union
 
 import matplotlib.pyplot as plt
 from pandas import DataFrame
+
+MinMaxValue = namedtuple('MinMaxValue', 'min_value max_value')
+
+
+def get_min_max(samples: list[Union[npt.ArrayLike]]) -> MinMaxValue:
+    min_value = sys.float_info.max
+    max_value = sys.float_info.min
+
+    for data in samples:
+        min_value = min(min(data), min_value)
+        max_value = max(max(data), max_value)
+
+    return min_value, max_value
 
 
 def plot_dfs(data: List[DataFrame]):
