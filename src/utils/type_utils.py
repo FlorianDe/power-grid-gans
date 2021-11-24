@@ -1,4 +1,6 @@
-from typing import Any, Type
+from typing import Any, Type, Union
+
+LogBase = Union[float, int]
 
 
 def check_list_type(obj: list[Any], element_type: Type):
