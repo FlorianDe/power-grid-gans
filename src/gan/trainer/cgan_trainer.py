@@ -12,7 +12,7 @@ from metrics.forecast_performance import mase
 from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.data_holder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
-from src.gan.trainer.trainer_types import TrainModel
+from src.gan.trainer.typing import TrainModel
 from src.net import CustomModule
 from src.net.dynamic import FNN
 from src.utils.datetime_utils import dates_to_conditional_vectors

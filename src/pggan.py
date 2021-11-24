@@ -13,7 +13,7 @@ from metrics.timeseries_decomposition import decompose_weather_data
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.data.data_holder import DataHolder
 from src.gan.trainer.cgan_trainer import CGANBasicGenerator, CGANBasicDiscriminator, CGANTrainer
-from src.gan.trainer.trainer_types import TrainModel
+from src.gan.trainer.typing import TrainModel
 from src.utils.args_utils import DataclassArgumentParser, Choice, Int, Arg, Str, Float
 from src.utils.datetime_utils import dates_to_conditional_vectors, convert_input_str_to_date
 from src.utils.path_utils import get_root_project_path

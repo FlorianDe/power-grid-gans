@@ -8,11 +8,11 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
-from data.dataholder import DataHolder
+from src.data.data_holder import DataHolder
 from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.discriminator.basic_discriminator import BasicDiscriminator
 from src.gan.generator.basic_generator import BasicGenerator
-from src.gan.trainer.trainer_types import TrainModel
+from src.gan.trainer.typing import TrainModel
 from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 
 

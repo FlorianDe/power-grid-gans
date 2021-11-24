@@ -5,7 +5,7 @@ import numpy.typing as npt
 import torch
 from torch.utils.data import TensorDataset, SubsetRandomSampler
 
-from data.types import Feature
+from data.typing import Feature
 from src.data.normalization import BaseNormalizer, NoneNormalizer
 from utils.type_utils import check_list_type
 

@@ -6,11 +6,11 @@ from typing import Union
 import torch
 
 from data.serializer.csv_serializer import CsvSerializer
-from data.types import Feature
+from data.typing import Feature
 from src.constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
 from src.data.data_holder import DataHolder
 from src.data.normalization.base_normalizer import BaseNormalizer
-from src.gan.trainer.trainer_types import TrainModel
+from src.gan.trainer.typing import TrainModel
 from utils.datetime_utils import format_timestamp
 
 

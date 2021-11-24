@@ -15,7 +15,7 @@ from torch.nn import Module
 from constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
 from data.normalization.base_normalizer import BaseNormalizer
 from data.serializer.csv_serializer import CsvSerializer
-from data.types import Feature
+from data.typing import Feature
 from utils.datetime_utils import dates_to_conditional_vectors, interval_generator
 
 from utils.path_utils import get_root_project_path

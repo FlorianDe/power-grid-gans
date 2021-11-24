@@ -97,7 +97,7 @@ def generate_sinusoidal_time_series(sample_count: int,
 
 if __name__ == '__main__':
     seq_len = 1000  # 365 * 24
-    samples = generate_sinusoidal_time_series(1, seq_len, 1, func=signal.sawtooth, normalize=False)  # np.sin, np.cos, np.tan, signal.sawtooth, signal.square
+    samples = generate_sinusoidal_time_series(1, seq_len, 10, func=np.sin, normalize=True)  # np.sin, np.cos, np.tan, signal.sawtooth, signal.square
     for sample_idx in range(len(samples)):
         feature_series = np.transpose(samples[sample_idx])
         for feature_idx in range(len(feature_series)):
