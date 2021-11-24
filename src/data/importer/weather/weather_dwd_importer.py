@@ -73,12 +73,12 @@ class WeatherDataSet:
 
 
 class WeatherDataColumns(metaclass=FinalClass):
-    T_AIR_DEGREE_CELSIUS: Final[str] = "t_air_degree_celsius"
-    DH_W_PER_M2: Final[str] = "dh_w_per_m2"
-    GH_W_PER_M2: Final[str] = "gh_w_per_m2"
-    WIND_V_M_PER_S: Final[str] = "wind_v_m_per_s"
-    WIND_DIR_DEGREE: Final[str] = "wind_dir_degree"
-    CLOUD_PERCENT: Final[str] = "cloud_percent"
+    T_AIR_DEGREE_CELSIUS: Final[str] = "t_air_degree_celsius"  # Temperatur Celsius
+    DH_W_PER_M2: Final[str] = "dh_w_per_m2"  # Stundensumme der diffusen solaren Strahlung
+    GH_W_PER_M2: Final[str] = "gh_w_per_m2"  # Stundensumme der Globalstrahlung
+    WIND_V_M_PER_S: Final[str] = "wind_v_m_per_s"  # Windgeschwindigkeit in m/s
+    WIND_DIR_DEGREE: Final[str] = "wind_dir_degree"  # Windrichtung in Grad (0 - 359)
+    CLOUD_PERCENT: Final[str] = "cloud_percent"  # Prozentuale Wolkenbedeckung
     SUN_HOURS_MIN_PER_H: Final[str] = "sun_hours_min_per_h"
 
 
@@ -246,4 +246,5 @@ class DWDWeatherDataImporter:
 if __name__ == "__main__":
     importer = DWDWeatherDataImporter()
     importer.initialize()
+    print(importer.data.size)
     plot_dfs([importer.data])
