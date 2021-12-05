@@ -20,6 +20,7 @@ def draw_qq_plot(
         theo_pd: PlotData[npt.ArrayLike],
         quantile_count: Optional[int] = None,
         reference_lines: Optional[set[QQReferenceLine]] = None,
+        extra_quantile_points: Optional[list[float]] = None,
         plot_options: PlotOptions = PlotOptions('QQ-Plot')
 ) -> PlotResult:
     if reference_lines is None:
@@ -63,7 +64,7 @@ def draw_qq_plot(
     # 2. A least squares regression line
     if QQReferenceLine.LEAST_SQUARES_REGRESSION in reference_lines:
         slope, intercept, r, prob, _ = stats.linregress(theo_quant_values, real_quant_values)
-        ax.plot(theo_quant_values, slope*theo_quant_values + intercept, 'k-', alpha=0.9, label='Least Square Regression')
+        ax.plot(theo_quant_values, slope*theo_quant_values + intercept, 'k-', alpha=0.9, label='Least square regression')
 
     # 3. 45° degree line
     if QQReferenceLine.THEORETICAL_LINE in reference_lines:
@@ -73,6 +74,19 @@ def draw_qq_plot(
 
     # plot everything in one go into a normal plot
     # ax.plot(theo_quant_values, real_quant_values, 'bo', theo_quant_values, slope*theo_quant_values + intercept, 'r-')
+
+    if extra_quantile_points is not None and len(extra_quantile_points) > 0:
+        points = [Point(np.quantile(theo_sorted, quantile), np.quantile(real_sorted, quantile)) for quantile in extra_quantile_points]
+            # ax.plot(theo_quant_values, slope * theo_quant_values + intercept, 'r-', alpha=0.9)
+        ax.scatter(list(map(lambda p: p.x, points)), list(map(lambda p: p.y, points)))
+        for idx in range(len(extra_quantile_points)):
+            # ax.annotate(f"{extra_quantile_points[idx]}q", points[idx])
+            ax.annotate(f"{extra_quantile_points[idx]}q", xy=points[idx],  xycoords='data',
+                        xytext=(3, -3), textcoords='offset pixels',
+                        # xytext=(0.8, 0.95), textcoords='axes fraction',
+                        # arrowprops=dict(facecolor='black', shrink=0.05),
+                        horizontalalignment='left', verticalalignment='top',
+                        )
 
     ax.set_title(plot_options.title)
     ax.set_xlabel(theo_pd.label if theo_pd.label is not None else plot_options.x_label)

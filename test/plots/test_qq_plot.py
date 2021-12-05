@@ -23,7 +23,8 @@ def test_draw_qq_plot():
             # QQReferenceLine.THEORETICAL_LINE,
             QQReferenceLine.FIRST_THIRD_QUARTIL,
             QQReferenceLine.LEAST_SQUARES_REGRESSION
-        }
+        },
+        [0.25, 0.5, 0.75]
     )
     res.fig.show()
 
