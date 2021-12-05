@@ -25,6 +25,3 @@ class TestKolmogorovSmirnov(unittest.TestCase):
 
         self.assertTrue(ks_xy.statistic < crit_xy)
         self.assertTrue(ks_xz.statistic > crit_xz)
-
-        # print(anderson_ksamp([x, y], midrank=False))
-        # print(anderson_ksamp([x, z], midrank=False))
