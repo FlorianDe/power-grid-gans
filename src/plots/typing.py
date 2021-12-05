@@ -1,5 +1,6 @@
 from collections import namedtuple
 from dataclasses import dataclass
+from enum import Enum
 
 from typing import TypeVar, Generic, Optional, Union
 
@@ -27,12 +28,18 @@ class PlotResult:
         plt.close(self.fig)
 
 
+class Locale(Enum):
+    DE = 'DE'
+    EN = 'EN'
+
+
 @dataclass
 class PlotOptions:
     title: Optional[str]
     legend_location: str = "best",
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
+    locale: Locale = Locale.DE
 
 
 @dataclass

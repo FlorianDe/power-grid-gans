@@ -9,8 +9,8 @@ from plots.typing import PlotResult, PlotData, PlotOptions
 
 def draw_box_like_plot(
         raw_plot_data: list[PlotData[npt.ArrayLike]],
-        plot_options: PlotOptions = PlotOptions('Box plot'),
-        box_plot_fn: Callable[[Axes, list[npt.ArrayLike]], Any] = lambda ax, data: ax.boxplot(data),
+        plot_options: PlotOptions,
+        box_plot_fn: Callable[[Axes, list[npt.ArrayLike]], Any],
         plot: Optional[PlotResult] = None
 ) -> PlotResult:
     fig, ax = plt.subplots(nrows=1, ncols=1) if plot is None else plot
@@ -40,4 +40,9 @@ def draw_box_plot(
         plot_options: PlotOptions = PlotOptions('Box plot'),
         plot: Optional[PlotResult] = None
 ) -> PlotResult:
-    return draw_box_like_plot(raw_plot_data=raw_plot_data, plot_options=plot_options, plot=plot)
+    return draw_box_like_plot(
+        raw_plot_data=raw_plot_data,
+        plot_options=plot_options,
+        box_plot_fn=lambda ax, data: ax.boxplot(data),
+        plot=plot
+    )
