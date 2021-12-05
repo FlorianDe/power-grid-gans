@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Callable
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -13,9 +13,30 @@ class ECDFPlotData(PlotData[PlotDataType]):
     confidence_band_alpha: Optional[float] = None
     confidence_band_fill_alpha: Optional[float] = None
     confidence_band_color: Optional[PlotColor] = None
+    confidence_band_label_supplier: Optional[Callable[[float], str]] = None
 
 
 def _conf_set(y, alpha: float):
+    r"""
+    Constructs a Dvoretzky-Kiefer-Wolfowitz confidence band for the eCDF.
+
+    Parameters
+    ----------
+    F : array_like
+        The empirical distributions
+    alpha : float
+        Set alpha for a (1 - alpha) % confidence band.
+
+    Notes
+    -----
+    Based on the DKW inequality.
+
+    .. math:: P \left( \sup_x \left| F(x) - \hat(F)_n(X) \right| > \epsilon \right) \leq 2e^{-2n\epsilon^2}
+
+    References
+    ----------
+    Wasserman, L. 2006. `All of Nonparametric Statistics`. Springer.
+    """
     nobs = len(y)
     epsilon = np.sqrt(np.log(2.0 / alpha) / (2 * nobs))
     lower = np.clip(y - epsilon, 0, 1)
@@ -43,7 +64,9 @@ def draw_ecdf_plot(
         y = ecdf.data.y
         if ecdf.confidence_band_alpha != 0.0:
             lower, upper = _conf_set(y, ecdf.confidence_band_alpha)
-            ax.fill_between(x, lower, upper, alpha=ecdf.confidence_band_fill_alpha, label=f"Confidence band {ecdf.confidence_band_alpha} \u03B1")
+            a = 1 - ecdf.confidence_band_alpha
+            conf_band_label = ecdf.confidence_band_label_supplier(a) if ecdf.confidence_band_label_supplier is not None else f"{a}% confidence band of {ecdf.label}"
+            ax.fill_between(x, lower, upper, alpha=ecdf.confidence_band_fill_alpha, label=conf_band_label)
         ax.step(x, y, where="post", label=ecdf.label)
         # plt.step(x, lower, "r", where="post")
         # plt.step(x, upper, "r", where="post")
