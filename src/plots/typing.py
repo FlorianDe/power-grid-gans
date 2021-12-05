@@ -1,9 +1,11 @@
 from collections import namedtuple
 from dataclasses import dataclass
+
 from typing import TypeVar, Generic, Optional, Union
 
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 
 PlotDataType = TypeVar("PlotDataType")
 PlotColor = Union[str, list[str]]
@@ -13,7 +15,10 @@ Point = namedtuple('Point', 'x y')
 @dataclass
 class PlotResult:
     fig: Figure
-    ax: plt.Axes
+    ax: Axes
+
+    def __iter__(self):
+        return iter((self.fig, self.ax))
 
     def show(self, warn=True):
         self.fig.show(warn)
