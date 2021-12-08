@@ -35,10 +35,10 @@ class Locale(Enum):
 
 @dataclass
 class PlotOptions:
-    title: Optional[str]
-    legend_location: str = "best",
-    x_label: Optional[str] = None,
-    y_label: Optional[str] = None,
+    title: Optional[str] = None
+    legend_location: str = "best"
+    x_label: Optional[str] = None
+    y_label: Optional[str] = None
     locale: Locale = Locale.DE
 
 

@@ -23,8 +23,8 @@ from src.utils.path_utils import unzip, get_root_project_path
 # reciprocal). So the calculation we need to apply is
 # 1 / (3.6*1e^3) * 1 / 1e^-4 = 1e^4 / (3.6*1e^3) = 1e^1 / 3.6
 # which is equal to:
-from utils.plot_utils import plot_dfs
-from utils.python_ext import FinalClass
+from src.utils.plot_utils import plot_dfs
+from src.utils.python_ext import FinalClass
 
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
@@ -82,7 +82,7 @@ class WeatherDataColumns(metaclass=FinalClass):
     SUN_HOURS_MIN_PER_H: Final[str] = "sun_hours_min_per_h"
 
 
-weatherDataSourcesMap: dict[WeatherDimension, WeatherDataSet] = {
+WEATHER_DATA_MAPPING: dict[WeatherDimension, WeatherDataSet] = {
     WeatherDimension.AIR: WeatherDataSet(
         fileUrlPath="air_temperature/historical/stundenwerte_TU_00691_19490101_20201231_hist",
         columns=[
@@ -163,7 +163,7 @@ class DWDWeatherDataImporter:
 
     def __load(self):
         print(f'Loading and transforming data:')
-        for dimension in weatherDataSourcesMap.keys():
+        for dimension in WEATHER_DATA_MAPPING.keys():
             self.__load_data_dimension(dimension)
 
         # data = data.clip(lower=0) # clip outlier data
@@ -182,8 +182,8 @@ class DWDWeatherDataImporter:
         # ])
 
     def __preprocess(self):
-        for dimension in weatherDataSourcesMap.keys():
-            weather_data_set = weatherDataSourcesMap[dimension]
+        for dimension in WEATHER_DATA_MAPPING.keys():
+            weather_data_set = WEATHER_DATA_MAPPING[dimension]
             for column in weather_data_set.columns:
                 target = column.targetColumn
                 if column.dataPreprocessing is not None and self.data[target] is not None:
@@ -201,7 +201,7 @@ class DWDWeatherDataImporter:
         # path = os.path.join(self.path, "tmp")
         os.makedirs(self.path, exist_ok=True)
 
-        for weatherDimension, weatherSource in weatherDataSourcesMap.items():
+        for weatherDimension, weatherSource in WEATHER_DATA_MAPPING.items():
             file_download_url = f'{BASE_URL}/{weatherSource.fileUrlPath}{weatherSource.fileSuffix}'
             weather_source_file_name = file_download_url.rsplit("/", 1)[-1]
             if not os.path.exists(os.path.join(self.path, weather_source_file_name)):
@@ -212,7 +212,7 @@ class DWDWeatherDataImporter:
 
     def __load_data_dimension(self, target: WeatherDimension) -> None:
         target_dimension_name = target.value.lower()
-        weather_data_set = weatherDataSourcesMap[target]
+        weather_data_set = WEATHER_DATA_MAPPING[target]
         target_folder_name = os.path.join(self.path, target_dimension_name)
         files = os.listdir(target_folder_name)
         target_data_file_name = [f for f in files if f.startswith(PRODUKT_FILE_NAME_BEGINNING)][0]
