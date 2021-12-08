@@ -1,76 +1,64 @@
-import numpy as np
-import numpy.typing as npt
-from matplotlib import pyplot as plt
-from scipy import stats
+import seaborn as sns
 
-from statsmodels.distributions.empirical_distribution import ECDF
+from data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter, WeatherDataColumns, WEATHER_DATA_MAPPING
 
-from data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter, WeatherDataColumns
+from experiments.utils import get_experiments_folder
 
-
-def bin_plot_data(data: npt.ArrayLike, title: str, binwidth: float = 5):
-    min_data = min(data)
-    max_data = max(data)
-    # pmf, bins = np.histogram(data, bins=np.arange(min_data, max_data + binwidth, binwidth), density=True)
-    # res = np.column_stack((bins[:-1], pmf))
-    # plt.plot(bins, pmf)
-    plt.hist(data, bins=np.arange(min(data), max(data) + binwidth, binwidth))
-    plt.title(f"Histogram: {title}")
-    plt.show()
-
-
-def visualize_pdf(data, pdf):
-    # sb.set_style('whitegrid')
-    plt.plot(data, pdf, 'r-', lw=2, alpha=0.6, label='expon pdf', color='k')
-    plt.xlabel('intervals')
-    plt.ylabel('Probability Density')
-    plt.show()
-
-
-def plot_ecdf(data, title: str, dist="norm", sparams=()):
-    ecdf = ECDF(data)
-    plt.plot(ecdf.x, ecdf.y)
-    plt.title(f"ECDF-{title}")
-    plt.show()
-
-    # plot Q-Q
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    res = stats.probplot(data, dist=dist, sparams=sparams, plot=ax)
-    print(f"{title=} with {dist} -> {res=}")
-    ax.set_title(f"QQ-Plot-{title}")
-    fig.show()
-
+from src.plots.distribution_fit_plot import DistributionPlotColumn, draw_best_fit_plot
+from src.plots.typing import PlotOptions
 
 if __name__ == '__main__':
-    importer = DWDWeatherDataImporter()
+    sns.set_theme()
+    sns.set_context("paper")
+    explore_dists_folder = get_experiments_folder().joinpath("01_explore_data_distributions")
+    explore_dists_folder.mkdir(parents=True, exist_ok=True)
+    importer = DWDWeatherDataImporter(end_date="2009-12-31 23:00:00")
     importer.initialize()
-    ##dh_w_per_m2_without_zero = importer.data[importer.data > 1][WeatherDataColumns.DH_W_PER_M2].dropna()
-    ##print(stats.exponweib.fit(dh_w_per_m2_without_zero))
-    # bin_plot_data(dh_w_per_m2_without_zero, 5)  # normal distribution
+    # extract all used targetColumns
+    used_target_columns = [col_map.targetColumn for nested in WEATHER_DATA_MAPPING.values() for col_map in nested.columns]
+    target_column_extra_info: dict[str, DistributionPlotColumn] = {
+        WeatherDataColumns.T_AIR_DEGREE_CELSIUS: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Temperatur in °C"),
+            extra_dist_plots=["norm", "gennorm"],
+            legend_spacing=True
+        ),
+        WeatherDataColumns.DH_W_PER_M2: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Stundensumme der diffusen Solarstrahlung"),
+            extra_dist_plots=["exponential", "beta"],
+        ),
+        WeatherDataColumns.GH_W_PER_M2: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Stundensumme der Globalstrahlung"),
+            extra_dist_plots=["exponential", "beta"],
+        ),
+        WeatherDataColumns.WIND_V_M_PER_S: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Windgeschwindigkeit in m/s"),
+            extra_dist_plots=["rayleigh"],
+        ),
+        WeatherDataColumns.WIND_DIR_DEGREE: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Windrichtung in Grad (0 - 359)"),
+            extra_dist_plots=["uniform", "random"],
+            bins=36,  # Since 360 degree and only in steps*10
+            legend_spacing=True
+        ),
+        WeatherDataColumns.CLOUD_PERCENT: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Prozentuale Wolkenbedeckung in %"),
+            extra_dist_plots=[]
+        ),
+        WeatherDataColumns.SUN_HOURS_MIN_PER_H: DistributionPlotColumn(
+            plot_options=PlotOptions(x_label="Sonnenstunden min/h"),
+            extra_dist_plots=[]
+        ),
+    }
 
-    bin_plot_data(importer.data[WeatherDataColumns.T_AIR_DEGREE_CELSIUS], WeatherDataColumns.T_AIR_DEGREE_CELSIUS, 1)  # normal distribution
-    bin_plot_data(importer.data[WeatherDataColumns.DH_W_PER_M2], WeatherDataColumns.DH_W_PER_M2,  5)  # exponential/beta? distribution
-    # bin_plot_data(importer.data[WeatherDataColumns.GH_W_PER_M2], WeatherDataColumns.GH_W_PER_M2, 5)  # exponential/beta? distribution
-    bin_plot_data(importer.data[WeatherDataColumns.WIND_V_M_PER_S], WeatherDataColumns.WIND_V_M_PER_S, 1)  # rayleigh distribution
-    bin_plot_data(importer.data[WeatherDataColumns.WIND_DIR_DEGREE], WeatherDataColumns.WIND_DIR_DEGREE, 1)  # uniform/random distribution
+    data_info = [(column, target_column_extra_info[column]) for column in used_target_columns if target_column_extra_info[column] is not None]
 
-    # fit_res = expon.fit(importer.data[WeatherDataColumns.DH_W_PER_M2])
-    # exp_pdf = expon.pdf(fit_res)
-    # visualize_pdf(fit_res, exp_pdf)
-
-    # Check this for fittings: https://stackoverflow.com/a/16651955/11133168
-    plot_ecdf(importer.data[WeatherDataColumns.T_AIR_DEGREE_CELSIUS], WeatherDataColumns.T_AIR_DEGREE_CELSIUS)  # good
-
-    plot_ecdf(importer.data[WeatherDataColumns.DH_W_PER_M2], WeatherDataColumns.DH_W_PER_M2, stats.beta, sparams=(0.3, 2))
-    # plot_ecdf(importer.data[WeatherDataColumns.DH_W_PER_M2], stats.rayleigh, sparams=(306,))
-    # plot_ecdf(importer.data[WeatherDataColumns.DH_W_PER_M2], stats.weibull_min, sparams=(0.19925197526753652, 2.2125306785365266))  # (0.39911867132844703, -1.0116216408139537e-26, 17.55878804720284), without 0 values (0.19925197526753652, 2.7777777777777772, 2.2125306785365266)
-    # plot_ecdf(importer.data[WeatherDataColumns.DH_W_PER_M2], stats.expon, sparams=(2.7777777777777777, 117.69589143207929))
-    # plot_ecdf(importer.data[WeatherDataColumns.DH_W_PER_M2], stats.exponweib, sparams=(0.7521034487635724, 1.064984731518368, 2.7777777777118837, 108.85637427247518))  # (1.5411043773762327, 0.37977251767629466, -6.933195992806934e-30, 100.00266735788577)
-
-    plot_ecdf(importer.data[WeatherDataColumns.WIND_V_M_PER_S], WeatherDataColumns.WIND_V_M_PER_S, stats.rayleigh)  # good
-
-    plot_ecdf(importer.data[WeatherDataColumns.WIND_DIR_DEGREE], WeatherDataColumns.WIND_DIR_DEGREE, stats.uniform)  # good
-
-    # hack
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    fig.show()
+    for target_column, column_plot_metadata in data_info:
+        data = importer.data[target_column]
+        fit_res = draw_best_fit_plot(
+            data=data,
+            plot_metadata=column_plot_metadata,
+        )
+        # save file
+        path = explore_dists_folder.joinpath(f"{target_column}.pdf").absolute()
+        fit_res.plot_res.fig.show()
+        fit_res.plot_res.fig.savefig(path, bbox_inches='tight')
