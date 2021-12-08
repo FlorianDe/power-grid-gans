@@ -6,9 +6,10 @@ import numpy.typing as npt
 from pandas import Series
 import matplotlib.pyplot as plt
 
-from data.fit.distribution_fit import residual_sum_of_squares, test_fit_against_all_distributions, create_pdf_series_from_distribution, \
-    DistributionFit
-from plots.typing import PlotResult, PlotOptions, Locale
+from src.data.fit.distribution_fit import test_fit_against_all_distributions, create_pdf_series_from_distribution, DistributionFit
+from src.metrics.r_squared import r_squared
+from src.plots.typing import PlotResult, PlotOptions, Locale
+
 
 
 class __Keys(Enum):
@@ -36,7 +37,7 @@ __PLOT_DICT: dict[__Keys, dict[Locale, str]] = {
 
 @dataclass(frozen=True, eq=True)
 class DistributionPlotColumn:
-    bins: int = 200
+    bins: int = 100
     plot_options: PlotOptions = PlotOptions()
     extra_dist_plots: Optional[list[str]] = None
     legend_spacing: bool = False
@@ -49,20 +50,23 @@ class DistributionFitPlotResult:
     plot_res: PlotResult
 
 
-def __get_parameter_label(fit: DistributionFit):
+def __get_parameter_label(fit: DistributionFit, error_label: str):
     param_names = (fit.distribution.shapes + ', loc, scale').split(', ') if fit.distribution.shapes else ['loc', 'scale']
     param_str = ', '.join(['{}={:0.2f}'.format(k, v) for k, v in zip(param_names, fit.params.raw)])
-    dist_str = '{}({})'.format(fit.distribution_name, param_str)
+    dist_str = '{}({}), {}: {:.3f}'.format(fit.distribution_name, param_str, error_label, fit.score)
     return dist_str
 
 
 def draw_best_fit_plot(
         data: Series,
         plot_metadata: DistributionPlotColumn,
-        error_fn: Callable[[npt.ArrayLike, npt.ArrayLike], float] = residual_sum_of_squares,
+        error_fn: tuple[str, Callable[[npt.ArrayLike, npt.ArrayLike], float]] = ("R²", r_squared),
+        best_score_finder: Callable[[list[DistributionFit]], DistributionFit] = max
 ) -> DistributionFitPlotResult:
     def translate(key: __Keys) -> str:
         return __PLOT_DICT[key][plot_metadata.plot_options.locale]
+
+    error_label, error = error_fn
 
     # Create subfig
     fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -77,12 +81,12 @@ def draw_best_fit_plot(
     data_xlim = ax.get_xlim()
 
     # Find best fit distribution
-    fitted_distributions = test_fit_against_all_distributions(data, plot_metadata.bins, error_fn)
-    best_fit = min(fitted_distributions)
+    fitted_distributions = test_fit_against_all_distributions(data, plot_metadata.bins, error)
+    best_fit = best_score_finder(fitted_distributions)
 
     # Make PDF with best params
     best_pdf = create_pdf_series_from_distribution(best_fit.distribution, best_fit.params.raw)
-    best_pdf_label = __get_parameter_label(best_fit)
+    best_pdf_label = __get_parameter_label(best_fit, error_label)
     best_pdf.plot(lw=2, label=best_pdf_label, legend=True, ax=ax)
 
     legends_plotted = 2
@@ -91,13 +95,13 @@ def draw_best_fit_plot(
         for dist_name in extra_plots:
             dist = next((x for x in fitted_distributions if x.distribution_name == dist_name and x.distribution_name != best_fit.distribution_name), None)
             if dist is not None:
-                other_pdf_label = __get_parameter_label(dist)
+                other_pdf_label = __get_parameter_label(dist, error_label)
                 other_pdf = create_pdf_series_from_distribution(dist.distribution, dist.params.raw)
                 other_pdf.plot(lw=2, label=other_pdf_label, legend=True, ax=ax)
                 legends_plotted += 1
 
-    # Set plot limits and params, if legends spacing enabled create a 10% spacing for each legend entry
-    ax.set_ylim(data_ylim[0], data_ylim[1] if plot_metadata.legend_spacing is False else data_ylim[1] * (1 + legends_plotted / 10))
+    # Set plot limits and params, if legends spacing enabled create a 5% spacing for each legend entry
+    ax.set_ylim(data_ylim[0], data_ylim[1] if plot_metadata.legend_spacing is False else data_ylim[1] * (1 + (5*legends_plotted)/100))
     ax.set_xlim(data_xlim)
 
     if plot_metadata.plot_options.title is not None:
