@@ -8,6 +8,8 @@ absl-py==0.12.0
     # via tensorboard
 argparse===1.4.0
     # via -r requirements.in
+astral===2.2
+    # via -r requirements.in
 atari-py==0.2.6
     # via -r requirements.in
 attrs==21.2.0
@@ -137,7 +139,9 @@ python-dateutil==2.8.1
     #   matplotlib
     #   pandas
 pytz==2021.1
-    # via pandas
+    # via
+    #   astral
+    #   pandas
 requests-oauthlib==1.3.0
     # via google-auth-oauthlib
 requests==2.25.1
