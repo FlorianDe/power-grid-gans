@@ -4,7 +4,7 @@ from matplotlib import pyplot
 from numpy.typing import ArrayLike
 from statsmodels.tsa.seasonal import seasonal_decompose, DecomposeResult
 
-from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 
 
 def __decompose_sine(seed: int = 0) -> DecomposeResult:

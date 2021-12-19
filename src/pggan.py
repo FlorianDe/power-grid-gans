@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 
 from evaluator.evaluator import Evaluator
 from metrics.timeseries_decomposition import decompose_weather_data
-from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.data.data_holder import DataHolder
 from src.gan.trainer.cgan_trainer import CGANBasicGenerator, CGANBasicDiscriminator, CGANTrainer
 from src.gan.trainer.typing import TrainModel

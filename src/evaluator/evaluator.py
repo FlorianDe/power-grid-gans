@@ -12,13 +12,13 @@ from torch import Tensor
 from torch.jit import ScriptModule
 from torch.nn import Module
 
-from constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
-from data.normalization.base_normalizer import BaseNormalizer
-from data.serializer.csv_serializer import CsvSerializer
-from data.typing import Feature
-from utils.datetime_utils import dates_to_conditional_vectors, interval_generator
+from src.constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_NAME, GENERATOR_FEATURE_LABELS_FILE_NAME
+from src.data.normalization.base_normalizer import BaseNormalizer
+from src.data.serializer.csv_serializer import CsvSerializer
+from src.data.typing import Feature
+from src.utils.datetime_utils import dates_to_conditional_vectors, interval_generator
 
-from utils.path_utils import get_root_project_path
+from src.utils.path_utils import get_root_project_path
 
 
 class Evaluator:
@@ -48,7 +48,7 @@ class Evaluator:
                 days = np.repeat(d.day, batch_size)
                 hours = np.arange(batch_size)
                 conditions = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
-                current_res = self.model(noises, conditions)
+                current_res = self.model(noises)#, conditions)
                 if result is None:
                     result = current_res
                 else:

@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from metrics.forecast_performance import mase
 from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.data_holder import DataHolder
-from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.trainer.typing import TrainModel
 from src.net import CustomModule
 from src.net.dynamic import FNN

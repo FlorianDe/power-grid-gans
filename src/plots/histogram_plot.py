@@ -1,12 +1,11 @@
 from dataclasses import dataclass
-from typing import Generic, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 from matplotlib import pyplot as plt
 
-from plots.typing import PlotData, PlotOptions, PlotResult, PlotColor, PlotDataType
-from utils.plot_utils import get_min_max
+from src.plots.typing import PlotData, PlotOptions, PlotResult, PlotColor, PlotDataType
+from src.utils.plot_utils import get_min_max
 
 
 @dataclass

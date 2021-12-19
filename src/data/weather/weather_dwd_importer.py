@@ -9,7 +9,7 @@ import pandas as pd
 import wget
 from pandas import DataFrame
 
-from src.data.processor.pandas.pandas_preprocessor import PandasPreprocessor
+from src.data.weather.weather_filters import clip_to_zero
 from src.utils.path_utils import unzip, get_root_project_path
 
 # Base code from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/weather_data.py
@@ -26,6 +26,8 @@ from src.utils.path_utils import unzip, get_root_project_path
 from src.utils.plot_utils import plot_dfs
 from src.utils.python_ext import FinalClass
 
+DATE_TIME_FORMAT = "%Y%m%d%H"
+
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
 DATE_COL_SOL = 8
@@ -35,10 +37,6 @@ DEFAULT_DATA_START_DATE = "2009-01-01 00:00:00"
 DEFAULT_DATA_END_DATE = "2019-12-31 23:00:00"
 BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly/"
 PRODUKT_FILE_NAME_BEGINNING = 'produkt'
-
-
-def clip_to_zero(data: DataFrame) -> DataFrame:
-    return PandasPreprocessor(data).clip(0).run()
 
 
 class WeatherDimension(Enum):
@@ -69,7 +67,7 @@ class WeatherDataSet:
     fileUrlPath: str
     columns: List[ColumnMapping]
     fileSuffix: str = '.zip'
-    dateTimeParser: Callable[[str], datetime] = lambda date: datetime.strptime(date, "%Y%m%d%H")
+    dateTimeParser: Callable[[str], datetime] = lambda date: datetime.strptime(date, DATE_TIME_FORMAT)
 
 
 class WeatherDataColumns(metaclass=FinalClass):

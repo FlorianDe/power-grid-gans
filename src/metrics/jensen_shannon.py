@@ -1,8 +1,8 @@
 from math import sqrt
 import numpy.typing as npt
 
-from metrics.kullback_leibler import __calculate_kl_divergence
-from utils.type_utils import LogBase
+from src.metrics.kullback_leibler import __calculate_kl_divergence
+from src.utils.type_utils import LogBase
 
 
 def js_divergence(p: npt.ArrayLike, q: npt.ArrayLike, base: LogBase = 2) -> float:

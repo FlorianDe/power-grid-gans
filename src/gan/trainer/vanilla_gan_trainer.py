@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.data.data_holder import DataHolder
-from src.data.importer.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 from src.gan.discriminator.basic_discriminator import BasicDiscriminator
 from src.gan.generator.basic_generator import BasicGenerator
 from src.gan.trainer.typing import TrainModel
@@ -34,7 +34,7 @@ class VanillaGANTrainer:
         self.noise_vector_size = noise_vector_size
         self.sequence_length = sequence_length
         self.batch_size = batch_size
-        self.features = features
+        # self.features = features
         self.device = device
 
         print("Dataset Size:", self.data_holder.data.shape)

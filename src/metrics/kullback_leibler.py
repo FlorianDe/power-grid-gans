@@ -1,7 +1,7 @@
 from math import log
 import numpy.typing as npt
 
-from utils.type_utils import LogBase
+from src.utils.type_utils import LogBase
 
 
 def __calculate_kl_divergence(p: npt.ArrayLike, q: npt.ArrayLike, base: LogBase) -> float:

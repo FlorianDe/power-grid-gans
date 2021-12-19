@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
+from plots.typing import PlotResult
 from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
 
 """
@@ -11,7 +12,8 @@ https://github.com/jsyoon0823/TimeGAN/blob/master/metrics/visualization_metrics.
 """
 
 
-def visualization(ori_data, generated_data, analysis):
+# TODO MOVE TO PLOTS
+def visualization(ori_data, generated_data, analysis) -> PlotResult:
     """Using PCA or tSNE for generated and original data visualization.
 
     Args:
@@ -25,6 +27,8 @@ def visualization(ori_data, generated_data, analysis):
     prep_data_hat = generated_data
     # Visualization parameter
     colors = ["red" for i in range(anal_sample_no)] + ["blue" for i in range(anal_sample_no)]
+    # Plotting
+    fig, ax = plt.subplots(1)
 
     if analysis == 'pca':
         # PCA Analysis
@@ -33,18 +37,16 @@ def visualization(ori_data, generated_data, analysis):
         pca_results = pca.transform(prep_data)
         pca_hat_results = pca.transform(prep_data_hat)
 
-        # Plotting
-        f, ax = plt.subplots(1)
         plt.scatter(pca_results[:, 0], pca_results[:, 1],
                     c=colors[:anal_sample_no], alpha=0.2, label="Original")
         plt.scatter(pca_hat_results[:, 0], pca_hat_results[:, 1],
                     c=colors[anal_sample_no:], alpha=0.2, label="Synthetic")
 
         ax.legend()
-        plt.title('PCA plot')
-        plt.xlabel('x-pca')
-        plt.ylabel('y_pca')
-        plt.show()
+        ax.set_title('PCA plot')
+        ax.set_xlabel('x-pca')
+        ax.set_ylabel('y_pca')
+        return PlotResult(fig, ax)
 
     elif analysis == 'tsne':
 
@@ -56,9 +58,6 @@ def visualization(ori_data, generated_data, analysis):
         tsne_results = tsne.fit_transform(prep_data)
         tsne_results_hat = tsne.fit_transform(prep_data_hat)
 
-        # Plotting
-        f, ax = plt.subplots(1)
-
         plt.scatter(tsne_results[:anal_sample_no, 0], tsne_results[:anal_sample_no, 1],
                     c=colors[:anal_sample_no], alpha=0.2, label="Original")
         plt.scatter(tsne_results_hat[:anal_sample_no, 0], tsne_results_hat[:anal_sample_no, 1],
@@ -66,10 +65,11 @@ def visualization(ori_data, generated_data, analysis):
 
         ax.legend()
 
-        plt.title('t-SNE plot')
-        plt.xlabel('x-tsne')
-        plt.ylabel('y_tsne')
-        plt.show()
+        ax.set_title('t-SNE plot')
+        ax.set_xlabel('x-tsne')
+        ax.set_ylabel('y_tsne')
+
+        return PlotResult(fig, ax)
 
 
 if __name__ == '__main__':
@@ -83,4 +83,5 @@ if __name__ == '__main__':
     snn.fit(gen)
     gen = snn.normalize(gen)
     # visualization(ori, gen, 'pca')
-    visualization(ori, gen, 'tsne')
+    res = visualization(ori, gen, 'tsne')
+    res.show()
