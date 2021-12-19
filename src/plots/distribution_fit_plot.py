@@ -2,14 +2,13 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Callable
 
+import matplotlib.pyplot as plt
 import numpy.typing as npt
 from pandas import Series
-import matplotlib.pyplot as plt
 
 from src.data.fit.distribution_fit import test_fit_against_all_distributions, create_pdf_series_from_distribution, DistributionFit
 from src.metrics.r_squared import r_squared
 from src.plots.typing import PlotResult, PlotOptions, Locale
-
 
 
 class __Keys(Enum):
@@ -41,6 +40,8 @@ class DistributionPlotColumn:
     plot_options: PlotOptions = PlotOptions()
     extra_dist_plots: Optional[list[str]] = None
     legend_spacing: bool = False
+    transformer: Optional[Callable[[Series], Series]] = None
+    drop_na_values: bool = True
 
 
 @dataclass(frozen=True, eq=True)
@@ -67,6 +68,10 @@ def draw_best_fit_plot(
         return __PLOT_DICT[key][plot_metadata.plot_options.locale]
 
     error_label, error = error_fn
+
+    # Drop na values if option set to true
+    if plot_metadata.drop_na_values is True:
+        data = data.dropna()
 
     # Create subfig
     fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -101,7 +106,7 @@ def draw_best_fit_plot(
                 legends_plotted += 1
 
     # Set plot limits and params, if legends spacing enabled create a 5% spacing for each legend entry
-    ax.set_ylim(data_ylim[0], data_ylim[1] if plot_metadata.legend_spacing is False else data_ylim[1] * (1 + (5*legends_plotted)/100))
+    ax.set_ylim(data_ylim[0], data_ylim[1] if plot_metadata.legend_spacing is False else data_ylim[1] * (1 + (5 * legends_plotted) / 100))
     ax.set_xlim(data_xlim)
 
     if plot_metadata.plot_options.title is not None:
