@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import signal
 
-from data.synthetical.sinusoidal import generate_sinusoidal_time_series
+from src.data.synthetical.sinusoidal import generate_sinusoidal_time_series
 
 
 def test_generate_sinusoidal_time_series():
@@ -12,4 +12,4 @@ def test_generate_sinusoidal_time_series():
         feature_series = np.transpose(samples[sample_idx])
         for feature_idx in range(len(feature_series)):
             plt.plot(feature_series[feature_idx])
-        plt.show()
+        # plt.show()

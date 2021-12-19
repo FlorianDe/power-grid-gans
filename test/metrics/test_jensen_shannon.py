@@ -3,7 +3,7 @@ import unittest
 from numpy import asarray
 from scipy.spatial.distance import jensenshannon
 
-from metrics.jensen_shannon import js_divergence, js_distance
+from src.metrics.jensen_shannon import js_divergence, js_distance
 
 
 class TestJensenShannon(unittest.TestCase):

@@ -1,11 +1,11 @@
 import numpy as np
+import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy import stats
 
-from plots.qq_plot import draw_qq_plot, QQReferenceLine
-from plots.typing import PlotData
+from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
+from src.plots.typing import PlotData
 
-import seaborn as sns
 
 
 def test_draw_qq_plot():

@@ -38,8 +38,12 @@ deactivate
 ```
 
 
+## Development
 
-## Developing
+### Running Tests
+```bash
+python3 setup.py pytest
+```
 ### Profiling
 #### 1. Tensorboard
 When training models we can use tensorboard to keep track of out models.

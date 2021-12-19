@@ -3,7 +3,7 @@ import unittest
 from numpy import asarray
 from scipy.stats import entropy
 
-from metrics.kullback_leibler import kl_divergence
+from src.metrics.kullback_leibler import kl_divergence
 
 
 class TestKullbackLeibler(unittest.TestCase):

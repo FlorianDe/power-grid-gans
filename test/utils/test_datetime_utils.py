@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from utils.datetime_utils import convert_input_str_to_date, interval_generator, format_timestamp
+from src.utils.datetime_utils import convert_input_str_to_date, interval_generator, format_timestamp
 
 
 class TestIntervalGenerator(unittest.TestCase):

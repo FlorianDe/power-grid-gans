@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
+from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 
 
 class TestKolmogorovSmirnov(unittest.TestCase):

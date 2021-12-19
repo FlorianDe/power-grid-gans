@@ -1,8 +1,8 @@
 import unittest
 from dataclasses import dataclass
 
-from data.serializer.csv_serializer import CsvSerializer
-from utils.path_utils import get_root_project_path
+from src.data.serializer.csv_serializer import CsvSerializer
+from src.utils.path_utils import get_root_project_path
 
 
 @dataclass

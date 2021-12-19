@@ -1,8 +1,8 @@
 import numpy as np
-
-from plots.histogram_plot import draw_hist_plot, HistPlotData
-
 import seaborn as sns
+
+from src.plots.histogram_plot import draw_hist_plot, HistPlotData
+
 
 
 def test_draw_hist_plot():

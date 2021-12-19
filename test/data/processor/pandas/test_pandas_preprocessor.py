@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from data.processor.pandas import PandasPreprocessor
-from data.processor.preprocessor import Preprocessor
+from src.data.processor.pandas import PandasPreprocessor
+from src.data.processor.preprocessor import Preprocessor
 
 
 class TestDataHolder(unittest.TestCase):

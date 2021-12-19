@@ -6,7 +6,7 @@ from astral import LocationInfo
 from astral.sun import sun
 import numpy as np
 
-from data.weather.sun_position_calculator import DayTime, SunPositionCalculator
+from src.data.weather.sun_position_calculator import DayTime, SunPositionCalculator
 
 class TestSunPositionCalculator(unittest.TestCase):
     def setUp(self) -> None:

@@ -3,7 +3,7 @@ import unittest
 import numpy
 from torch.utils.data import DataLoader
 
-from data.data_holder import DataHolder
+from src.data.data_holder import DataHolder
 
 
 class TestDataHolder(unittest.TestCase):

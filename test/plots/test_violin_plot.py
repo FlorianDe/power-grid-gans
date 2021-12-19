@@ -1,12 +1,10 @@
 import numpy as np
+import seaborn as sns
 from matplotlib import pyplot as plt
 
-from plots.box_plot import draw_box_plot
-from plots.typing import PlotData, PlotResult, PlotOptions
-
-import seaborn as sns
-
-from plots.violin_plot import draw_violin_plot
+from src.plots.typing import PlotData, PlotResult, PlotOptions
+from src.plots.box_plot import draw_box_plot
+from src.plots.violin_plot import draw_violin_plot
 
 
 def test_draw_violin_plot():

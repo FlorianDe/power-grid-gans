@@ -1,9 +1,9 @@
 import numpy as np
-
 import seaborn as sns
+
 from statsmodels.distributions import ECDF
 
-from plots.ecdf_plot import ECDFPlotData, draw_ecdf_plot
+from src.plots.ecdf_plot import ECDFPlotData, draw_ecdf_plot
 
 
 def test_draw_ecdf_plot():

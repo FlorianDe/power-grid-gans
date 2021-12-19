@@ -1,4 +1,4 @@
-from utils.type_utils import check_list_type
+from src.utils.type_utils import check_list_type
 
 
 def test_check_list_type_with_string_list():
