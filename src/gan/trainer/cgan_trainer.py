@@ -8,6 +8,8 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
+from gan.discriminator.basic_discriminator import BasicDiscriminator
+from gan.generator.basic_generator import BasicGenerator
 from metrics.forecast_performance import mase
 from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.data_holder import DataHolder
@@ -125,6 +127,12 @@ class CGANTrainer(BaseTrainer):
                     global_step=self.iter_no
                 )
 
+    def __prepare_generator_input(self, noise, labels):
+        return torch.cat((labels, noise), -1)
+
+    def __prepare_discriminator_input(self, data, labels):
+        return torch.cat((data, labels), -1)
+
     def train(self, max_epochs):
         for epoch in range(max_epochs):
             for i, (real_data, labels) in enumerate(self.train_data_loader):
@@ -148,10 +156,12 @@ class CGANTrainer(BaseTrainer):
                 gen_labels = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
 
                 # Generate a batch of data
-                generated_data = self.generator.model(z, gen_labels)
+                generator_input = self.__prepare_generator_input(z, gen_labels)
+                generated_data = self.generator.model(generator_input)
 
                 # Loss measures generator's ability to fool the discriminator
-                validity = self.discriminator.model(generated_data, gen_labels)
+                discriminator_gen_input = self.__prepare_discriminator_input(generated_data, gen_labels)
+                validity = self.discriminator.model(discriminator_gen_input)
                 g_loss = self.objective(validity, self.real_labels)
 
                 g_loss.backward()
@@ -162,11 +172,13 @@ class CGANTrainer(BaseTrainer):
                 self.discriminator.optimizer.zero_grad()
 
                 # Loss for real data
-                validity_real = self.discriminator.model(real_data, labels)
+                discriminator_real_input = self.__prepare_discriminator_input(real_data, labels)
+                validity_real = self.discriminator.model(discriminator_real_input)
                 d_real_loss = self.objective(validity_real, self.real_labels)
 
                 # Loss for fake data
-                validity_fake = self.discriminator.model(generated_data.detach(), gen_labels)
+                discriminator_fake_input = self.__prepare_discriminator_input(generated_data.detach(), gen_labels)
+                validity_fake = self.discriminator.model(discriminator_fake_input)
                 d_fake_loss = self.objective(validity_fake, self.fake_labels)
 
                 # Total discriminator loss
@@ -179,23 +191,23 @@ class CGANTrainer(BaseTrainer):
                 self.iter_no += 1
                 self.__write_training_stats(epoch, real_data, labels)
 
-            # validation step
-            generated_test_data: Union[torch.Tensor, None] = None
-            for i, (real_data, labels) in enumerate(self.validation_data_loader):
-                with torch.no_grad():
-                    z = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)), self.batch_size, axis=0).astype(dtype=np.float32))
-                    current_res = self.generator.model(z, labels)
-                    if generated_test_data is None:
-                        generated_test_data = current_res
-                    else:
-                        generated_test_data = torch.cat((generated_test_data, current_res))
-            # TODO wtf am i doing here
-            mase_res = mase(
-                generated_test_data.detach().numpy(),
-                self.validation_data_loader.dataset[self.validation_data_loader.sampler.indices][0].detach().numpy()[:len(generated_test_data)],
-                self.train_data_loader.dataset[self.train_data_loader.sampler.indices][0].detach().numpy(),
-            )
-            print(f"=> {epoch}. Epoch: {mase_res=}")
+            # # validation step
+            # generated_test_data: Union[torch.Tensor, None] = None
+            # for i, (real_data, labels) in enumerate(self.validation_data_loader):
+            #     with torch.no_grad():
+            #         z = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, self.noise_vector_size)), self.batch_size, axis=0).astype(dtype=np.float32))
+            #         current_res = self.generator.model(z, labels)
+            #         if generated_test_data is None:
+            #             generated_test_data = current_res
+            #         else:
+            #             generated_test_data = torch.cat((generated_test_data, current_res))
+            # # TODO wtf am i doing here
+            # mase_res = mase(
+            #     generated_test_data.detach().numpy(),
+            #     self.validation_data_loader.dataset[self.validation_data_loader.sampler.indices][0].detach().numpy()[:len(generated_test_data)],
+            #     self.train_data_loader.dataset[self.train_data_loader.sampler.indices][0].detach().numpy(),
+            # )
+            # print(f"=> {epoch}. Epoch: {mase_res=}")
 
 
 class CGANRNNGenerator(CustomModule):
@@ -231,28 +243,28 @@ class CGANRNNDiscriminator(CustomModule):
         return hidden
 
 
-class CGANBasicGenerator(CustomModule):
-    def __init__(self, input_size: int, out_size: int, hidden_layers: Optional[list[int]] = None):
-        super(CGANBasicGenerator, self).__init__()
-        self.fnn = FNN(input_size, out_size, hidden_layers)
+# class CGANBasicGenerator(CustomModule):
+#     def __init__(self, input_size: int, out_size: int, hidden_layers: Optional[list[int]] = None):
+#         super(CGANBasicGenerator, self).__init__()
+#         self.fnn = FNN(input_size, out_size, hidden_layers)
+#
+#     def forward(self, noise: Tensor, labels: Tensor):
+#         gen_input = torch.cat((labels, noise), -1)
+#         return self.fnn(gen_input)
 
-    def forward(self, noise: Tensor, labels: Tensor):
-        gen_input = torch.cat((labels, noise), -1)
-        return self.fnn(gen_input)
 
-
-class CGANBasicDiscriminator(CustomModule):
-    def __init__(self, input_size: int, out_size: int, hidden_layers: Optional[list[int]] = None):
-        super(CGANBasicDiscriminator, self).__init__()
-        self.fnn = FNN(input_size, out_size, hidden_layers)
-        self.activation = nn.Sigmoid()
-
-    def forward(self, data: Tensor, labels: Tensor):
-        x = torch.cat((data, labels), -1)
-        x = self.fnn(x)
-        x = self.activation(x)
-        x = x.view(-1)
-        return x
+# class CGANBasicDiscriminator(CustomModule):
+#     def __init__(self, input_size: int, out_size: int, hidden_layers: Optional[list[int]] = None):
+#         super(CGANBasicDiscriminator, self).__init__()
+#         self.fnn = FNN(input_size, out_size, hidden_layers)
+#         self.activation = nn.Sigmoid()
+#
+#     def forward(self, data: Tensor, labels: Tensor):
+#         x = torch.cat((data, labels), -1)
+#         x = self.fnn(x)
+#         x = self.activation(x)
+#         x = x.view(-1)
+#         return x
 
 
 if __name__ == '__main__':
@@ -264,12 +276,12 @@ if __name__ == '__main__':
     # sequence_length = 24
     batch_size = 24  # *7
     features = data_holder.get_feature_size()
-    G_net = CGANBasicGenerator(input_size=noise_vector_size + 14, out_size=features, hidden_layers=[200])
+    G_net = BasicGenerator(input_size=noise_vector_size + 14, out_size=features, hidden_layers=[200])
     G_optim = torch.optim.Adam(G_net.parameters())
     G_sched = StepLR(G_optim, step_size=30, gamma=0.1)
     G = TrainModel(G_net, G_optim, G_sched)
 
-    D_net = CGANBasicDiscriminator(input_size=features + 14, out_size=1, hidden_layers=[100, 50, 20])
+    D_net = BasicDiscriminator(input_size=features + 14, out_size=1, hidden_layers=[100, 50, 20])
     D_optim = torch.optim.Adam(D_net.parameters())
     D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)

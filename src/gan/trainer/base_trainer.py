@@ -11,7 +11,7 @@ from src.constants import GENERATOR_MODEL_FILE_NAME, GENERATOR_NORMALIZER_FILE_N
 from src.data.data_holder import DataHolder
 from src.data.normalization.base_normalizer import BaseNormalizer
 from src.gan.trainer.typing import TrainModel
-from utils.datetime_utils import format_timestamp
+from src.utils.datetime_utils import format_timestamp
 
 
 class BaseTrainer:

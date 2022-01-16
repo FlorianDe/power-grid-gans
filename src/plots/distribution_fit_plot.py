@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy.typing as npt
 from pandas import Series
 
-from src.data.fit.distribution_fit import test_fit_against_all_distributions, create_pdf_series_from_distribution, DistributionFit
+from src.data.distribution.distribution_fit import test_fit_against_all_distributions, create_pdf_series_from_distribution, DistributionFit
 from src.metrics.r_squared import r_squared
 from src.plots.typing import PlotResult, PlotOptions, Locale
 

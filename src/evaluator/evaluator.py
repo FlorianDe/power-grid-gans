@@ -22,9 +22,10 @@ from src.utils.path_utils import get_root_project_path
 
 
 class Evaluator:
-    def __init__(self, model: ScriptModule | Module, feature_labels: list[Feature], normalizer: Optional[BaseNormalizer] = None) -> None:
+    def __init__(self, model: ScriptModule | Module, noise_vector_size: int, feature_labels: list[Feature], normalizer: Optional[BaseNormalizer] = None) -> None:
         super().__init__()
         self.model = deepcopy(model)
+        self.noise_vector_size = noise_vector_size
         self.feature_labels = deepcopy(feature_labels)
         self.normalizer = deepcopy(normalizer)
 
@@ -37,22 +38,26 @@ class Evaluator:
                 y = self.normalizer.renormalize(y)
             return y
 
-    def generate(self, start_date: date, end_date: date) -> Tensor:
+    def generate(self, start_date: date, end_date: date, with_conditions = False) -> Tensor:
         with torch.no_grad():
             result: torch.Tensor | None = None
-            noise_vector_size = 50
             batch_size = 24
-            noises = torch.from_numpy(np.repeat(np.random.normal(0, 1, (1, noise_vector_size)), batch_size, axis=0).astype(dtype=np.float32))
+            rnd_vector = np.random.normal(0, 1, (1, len(self.feature_labels), self.noise_vector_size))
+            noises = torch.from_numpy(np.repeat(rnd_vector, batch_size, axis=0).astype(dtype=np.float32))
             for d in interval_generator(start_date, end_date):
-                months = np.repeat(d.month, batch_size)
-                days = np.repeat(d.day, batch_size)
-                hours = np.arange(batch_size)
-                conditions = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
-                current_res = self.model(noises)#, conditions)
+                generator_input = noises
+                # TODO GENERIFY LATER
+                if with_conditions:
+                    months = np.repeat(d.month, batch_size)
+                    days = np.repeat(d.day, batch_size)
+                    hours = np.arange(batch_size)
+                    conditions = torch.tensor(dates_to_conditional_vectors(months, days, hours), dtype=torch.float32, requires_grad=False)
+                    generator_input = torch.cat((noises, conditions), -1)
+                current_res = self.model(generator_input)
                 if result is None:
                     result = current_res
                 else:
-                    result = torch.cat((result, current_res))
+                    result = torch.cat((result, current_res), dim=-1)
             return result
 
     @staticmethod

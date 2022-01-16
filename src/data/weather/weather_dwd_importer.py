@@ -11,6 +11,9 @@ from pandas import DataFrame
 
 from src.data.weather.weather_filters import clip_to_zero
 from src.utils.path_utils import unzip, get_root_project_path
+from src.utils.plot_utils import plot_dfs
+from src.utils.python_ext import FinalClass
+from src.utils.pandas_utils import get_datetime_values
 
 # Base code from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/weather_data.py
 #
@@ -23,8 +26,7 @@ from src.utils.path_utils import unzip, get_root_project_path
 # reciprocal). So the calculation we need to apply is
 # 1 / (3.6*1e^3) * 1 / 1e^-4 = 1e^4 / (3.6*1e^3) = 1e^1 / 3.6
 # which is equal to:
-from src.utils.plot_utils import plot_dfs
-from src.utils.python_ext import FinalClass
+
 
 DATE_TIME_FORMAT = "%Y%m%d%H"
 
@@ -233,9 +235,7 @@ class DWDWeatherDataImporter:
         self.__data_labels.append(target_column)
 
     def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
-        if not isinstance(self.data.index, pd.DatetimeIndex):
-            raise ValueError("The index of the importer is no DatetimeIndex therefore it is not enforced to have a month, day and hour column!")
-        return self.data.index.month.values, self.data.index.day.values, self.data.index.hour.values
+        return get_datetime_values(self.data)
 
     def get_feature_labels(self):
         return self.__data_labels

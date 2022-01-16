@@ -79,5 +79,12 @@ pip install cmake
 pip install atari-py
 pip install gym[atari]
 ```
+
+# Misc
+## Create .gif from images
+```bash
+ffmpeg -f image2 -framerate 10 -i img_%03d.png -loop -1 animated.gif
+```
+
 # Docs
 tbd

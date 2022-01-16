@@ -8,10 +8,11 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from src.net.dynamic import ConvolutionalNet, RecurrentNet
 
+from playground.pytorch.classification.digits.models.digit_fnn import DigitLinearNet
+
+from src.net.dynamic import ConvolutionalNet, RecurrentNet
 from src.net import CustomModule
-from test.playground.classification.digits.models.digit_fnn import DigitLinearNet
 
 
 @dataclass

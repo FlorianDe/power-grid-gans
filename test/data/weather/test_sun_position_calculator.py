@@ -80,7 +80,9 @@ class TestSunPositionCalculator(unittest.TestCase):
             sunset_diff = abs(expected_sunset.raw_value - real_sunset.raw_value)
             if max_sunset_diff < sunset_diff:
                 max_sunset_diff = sunset_diff
-                print(f"{day}: {str(dt)} == {str(expected_sunrise)} => {max_sunset_diff} => {str(DayTime(max_sunset_diff))}")
+                dt_diff = DayTime(max_sunset_diff)
+                print(f"{day}: {str(dt)} == {str(expected_sunrise)} => {max_sunset_diff} => {str(dt_diff)}")
+                self.assertTrue(dt_diff.hour == 0 and dt_diff.minute == 0 and dt_diff.second <= 59)
 
             sunrise_comparision = real_sunrise.compare_to(expected_sunrise, 0.00069444)  # 1min => 0.69444...%
             self.assertTrue(sunrise_comparision)
