@@ -7,7 +7,7 @@ import torch
 from matplotlib import pyplot as plt
 from torch import Tensor, nn
 
-from experiments.utils import get_experiments_folder
+from experiments.image_generation.utils import get_generated_images_path_folder
 from src.plots.typing import PlotOptions, PlotResult
 
 
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     # sns.axes_style("darkgrid")
     # sns.set_context("paper")
 
-    generated_images = get_experiments_folder().joinpath("generated_images")
+    generated_images = get_generated_images_path_folder()
 
     activation_functions = generated_images.joinpath(f"activation_functions")
     activation_functions.mkdir(parents=True, exist_ok=True)
