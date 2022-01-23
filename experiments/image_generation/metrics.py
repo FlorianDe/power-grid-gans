@@ -1,17 +1,85 @@
 import functools
+from dataclasses import dataclass
 
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
+from scipy.stats import distributions
 
 from experiments.image_generation.utils import set_latex_plot_params
 from experiments.utils import get_experiments_folder
-from plots.histogram_plot import draw_hist_plot, HistPlotData
-from src.plots.typing import PlotResult, PlotOptions
+from src.plots.histogram_plot import draw_hist_plot, HistPlotData
+from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
+from src.plots.typing import PlotResult, PlotOptions, PlotData
 from src.utils.math_utils import LinearIntervalScaler
 
 
-def plot_histogram(normalized: bool = False) -> PlotResult:
+def normal_dist_str(mean, std):
+    return r"\mathcal{N}(" + str(mean) + r"," + str(std) + r")"
+
+
+def unif_dist_str(unif_start, unif_end):
+    return r"\mathcal{U}_{[" + str(unif_start) + r"," + str(unif_end) + "]}"
+
+
+@dataclass
+class NamedPlotResult:
+    name: str
+    plot: PlotResult
+
+
+def save_qq_plot_defaults() -> list[NamedPlotResult]:
+    np.random.seed(42)
+    n = 5000
+    unif_start, unif_end = 0, 1
+    d1 = np.random.uniform(unif_start, unif_end, int(n / 2))
+
+    norm_mean, norm_std = 0, 0.1
+    d2 = np.random.normal(norm_mean, norm_std, n)
+
+    results: list[NamedPlotResult] = []
+    for line in [
+        QQReferenceLine.THEORETICAL_LINE,
+        QQReferenceLine.FIRST_THIRD_QUARTIL,
+        QQReferenceLine.LEAST_SQUARES_REGRESSION
+    ]:
+        qq_res = draw_qq_plot(
+            PlotData(data=d1, label=r'$\displaystyle{\text{Stichprobe} \sim ' + unif_dist_str(unif_start, unif_end) + '}$'),
+            PlotData(data=d2, label=r"$\displaystyle{\text{Theoretische Verteilung} \sim " + normal_dist_str(norm_mean, norm_std) + "}$"),
+            5000,
+            {line},
+            [0.25, 0.5, 0.75]
+        )
+        results.append(NamedPlotResult(line.name, qq_res))
+
+    return results
+
+
+def save_qq_plot_norm_vs_norm() -> PlotResult:
+    np.random.seed(42)
+    n = 5000
+
+    norm_mean_theo, norm_std_theo = 0, 0.1
+    norm_mean_test, norm_std_test = 0, 0.1
+    d_theo = np.random.normal(norm_mean_theo, norm_std_theo, n)
+    d_test = np.random.normal(norm_mean_test, norm_std_test, n)
+
+    qq_res = draw_qq_plot(
+        PlotData(data=d_test, label=r'$\displaystyle{\text{Stichprobe} \sim ' + normal_dist_str(norm_mean_test, norm_std_test) + '}$'),
+        PlotData(data=d_theo, label=r"$\displaystyle{\text{Theoretische Verteilung} \sim " + normal_dist_str(norm_mean_theo, norm_std_theo) + "}$"),
+        5000,
+        {
+            QQReferenceLine.THEORETICAL_LINE,
+            # QQReferenceLine.FIRST_THIRD_QUARTIL,
+            # QQReferenceLine.LEAST_SQUARES_REGRESSION
+        },
+        [0.25, 0.5, 0.75]
+    )
+
+    return qq_res
+
+
+def save_histogram(normalized: bool = False) -> PlotResult:
     np.random.seed(42)
     n = 5000
     params = [
@@ -22,26 +90,28 @@ def plot_histogram(normalized: bool = False) -> PlotResult:
     pds = [
         HistPlotData(
             data=np.random.normal(p[0], p[1], p[2]),
-            label=r"$"+str(p[3])+r"\sim \mathcal{N}(" + str(p[0]) + r"," + str(p[1]) + r"), \left\lvert "+str(p[3])+r"\right\rvert ="+str(p[2])+r"$"
+            label=r"$" + str(p[3]) + r"\sim \mathcal{N}(" + str(p[0]) + r"," + str(p[1]) + r"), \left\lvert " + str(p[3]) + r"\right\rvert =" + str(p[2]) + r"$"
         ) for p in params
     ]
+    mean, var = distributions.norm.fit(pds[2].data)
+    print(mean, var)
     fig, ax = plt.subplots(nrows=1, ncols=1)
     all_values = functools.reduce(lambda acc, cur: np.concatenate((acc, cur.data)), pds, [])
-    bin_width = (max(all_values)-min(all_values))/50
+    bin_width = (max(all_values) - min(all_values)) / 50
     draw_hist_plot(
         pds=pds,
         bin_width=bin_width,
         normalized=normalized,
         plot_options=PlotOptions(
             x_label="$x$",
-            y_label="Relative Häufigkeit" if normalized else "Häufigkeit"
+            y_label="Relative Häufigkeitsdichte" if normalized else "Absolute Häufigkeit"
         ),
         plot=PlotResult(fig, ax)
     )
     return PlotResult(fig, ax)
 
 
-def plot_box_vs_violinplot() -> PlotResult:
+def save_box_vs_violinplot() -> PlotResult:
     figsize = (9, 4)
     text_fontsize = 14
     tick_labels_fontsize = 16
@@ -132,14 +202,22 @@ if __name__ == '__main__':
     metrics_folder = generated_images_folder.joinpath(f"metrics")
     metrics_folder.mkdir(parents=True, exist_ok=True)
 
-    violin_plot_res = plot_box_vs_violinplot()
+    violin_plot_res = save_box_vs_violinplot()
     violin_plot_res.fig.show()
     violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
 
-    histogram_res_default = plot_histogram()
+    histogram_res_default = save_histogram()
     histogram_res_default.fig.show()
     histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
 
-    histogram_res_normed = plot_histogram(True)
+    histogram_res_normed = save_histogram(True)
     histogram_res_normed.fig.show()
     histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
+
+    qq_plot_defaults_res = save_qq_plot_defaults()
+    for res in qq_plot_defaults_res:
+        res.plot.show()
+        res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
+    qq_plot_norm = save_qq_plot_norm_vs_norm()
+    qq_plot_norm.show()
+    qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
