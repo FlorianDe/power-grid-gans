@@ -7,8 +7,14 @@ import torch
 from matplotlib import pyplot as plt
 from torch import Tensor, nn
 
-from experiments.image_generation.utils import get_generated_images_path_folder
+from experiments.image_generation.utils import get_generated_images_path_folder, set_latex_plot_params
+
 from src.plots.typing import PlotOptions, PlotResult
+
+
+def wrap_with_latex_makro(value):
+    str_value = str(value)
+    return str_value if str_value.startswith("$") and str_value.endswith("$") else f"${str_value}$"
 
 
 @dataclass(frozen=True, eq=True)
@@ -49,11 +55,7 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
     x_label = "$x$"
     y_label = r"$\sigma(x)$"
 
-    plt.rcParams.update({
-        "text.usetex": True,
-        "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica"]})
-    plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
+    set_latex_plot_params()
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
@@ -83,7 +85,7 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
         x_labels[1] = r"$\dots$"
 
     ax.set_xticks(x_ticks)
-    ax.set_xticklabels(x_labels, fontsize=tick_labels_fontsize)
+    ax.set_xticklabels([wrap_with_latex_makro(x_label) for x_label in x_labels], fontsize=tick_labels_fontsize)
 
     max_y = max(y)
     y_default_ticks = [-1, 0, 1]
@@ -101,7 +103,7 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
                     y_labels.insert(0, add_tick.label)
 
     ax.set_yticks(y_tick_values)
-    ax.set_yticklabels(y_labels, fontsize=tick_labels_fontsize)
+    ax.set_yticklabels([wrap_with_latex_makro(y_label) for y_label in y_labels], fontsize=tick_labels_fontsize)
 
     # Set the tick labels font
     for label in (ax.get_xticklabels() + ax.get_yticklabels()):
