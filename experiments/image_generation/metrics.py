@@ -2,12 +2,15 @@ import functools
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.stats import distributions
+from statsmodels.tsa.seasonal import STL
 
 from experiments.image_generation.utils import set_latex_plot_params
 from experiments.utils import get_experiments_folder
+from plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData
 from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
 from src.plots.typing import PlotResult, PlotOptions, PlotData
@@ -26,6 +29,31 @@ def unif_dist_str(unif_start, unif_end):
 class NamedPlotResult:
     name: str
     plot: PlotResult
+
+
+def save_timeseries_plot() -> PlotResult:
+    np.random.seed(0)
+    n = 365*4
+    dates = np.array('2022-01-01', dtype=np.datetime64) + np.arange(n)
+    data = 20 * np.sin(2 * np.pi * np.arange(n) / 365) + np.random.normal(5, 2, n)
+    df = pd.DataFrame({'data': data}, index=dates)
+
+    decomp_result = STL(df, period=365).fit()
+
+    translations = {
+        DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
+        DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
+        DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
+        DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
+        DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
+    }
+    res = draw_timeseries_plot(
+        data=decomp_result,
+        translations=translations,
+        figsize=(6.4, 6.4)
+    )
+
+    return res
 
 
 def save_qq_plot_defaults() -> list[NamedPlotResult]:
@@ -221,3 +249,9 @@ if __name__ == '__main__':
     qq_plot_norm = save_qq_plot_norm_vs_norm()
     qq_plot_norm.show()
     qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
+
+    timeseries_decomposition_res = save_timeseries_plot()
+    timeseries_decomposition_res.fig.show()
+    timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
+
+
