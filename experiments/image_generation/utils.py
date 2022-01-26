@@ -8,8 +8,15 @@ from experiments.utils import get_experiments_folder
 def set_latex_plot_params():
     plt.rcParams.update({
         "text.usetex": True,
-        "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica"]})
+        "font.family": "serif",
+        "font.serif": ["Computer Modern"]
+    })  # Computer Modern
+    # plt.rcParams.update({
+    #     "text.usetex": True,
+    #     "font.family": "sans-serif",
+    #     "font.sans-serif": ["Helvetica"]
+    # })  # Helvetica
+
     plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
 
