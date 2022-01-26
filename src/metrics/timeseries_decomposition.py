@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot
+from matplotlib import pyplot as plt
 from numpy.typing import ArrayLike
-from statsmodels.tsa.seasonal import seasonal_decompose, DecomposeResult
+from statsmodels.tsa.seasonal import seasonal_decompose, STL, DecomposeResult
 
+from src.plots.timeseries_plot import draw_timeseries_plot
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 
 
@@ -14,7 +15,8 @@ def __decompose_sine(seed: int = 0) -> DecomposeResult:
     data = 12 * np.sin(2 * np.pi * np.arange(n) / 365) + np.random.normal(12, 2, 1500)
     df = pd.DataFrame({'data': data}, index=dates)
 
-    return seasonal_decompose(df, model='additive', period=365)
+    return STL(df, period=365).fit()
+    # return seasonal_decompose(df, model='additive', period=365)
 
 
 def decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> DecomposeResult:
@@ -38,14 +40,19 @@ def decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> D
 
 
 if __name__ == '__main__':
-    importer = DWDWeatherDataImporter()
-    importer.initialize()
-    data = importer.data['t_air_degree_celsius']
+    # importer = DWDWeatherDataImporter()
+    # importer.initialize()
+    # data = importer.data['t_air_degree_celsius']
+    #
+    # # difference between leap day and without
+    # # decompose_weather_data(data, 24 * 365).plot()
+    #
+    # for idx, key in enumerate(importer.data.keys()):
+    #     decompose_weather_data(importer.data[key]).plot()
 
-    # difference between leap day and without
-    # decompose_weather_data(data, 24 * 365).plot()
+    decomp_res = __decompose_sine()
+    draw_timeseries_plot(decomp_res, figsize=(6.4, 6.4)).show()
+    # res.plot()
+    # plt.show()
 
-    for idx, key in enumerate(importer.data.keys()):
-        decompose_weather_data(importer.data[key]).plot()
 
-    pyplot.show()
