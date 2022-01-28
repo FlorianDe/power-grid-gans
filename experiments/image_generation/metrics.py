@@ -6,15 +6,19 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.stats import distributions
+from statsmodels.distributions import ECDF
 from statsmodels.tsa.seasonal import STL
 
 from experiments.image_generation.utils import set_latex_plot_params
 from experiments.utils import get_experiments_folder
 from plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
+from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData
 from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
 from src.plots.typing import PlotResult, PlotOptions, PlotData
 from src.utils.math_utils import LinearIntervalScaler
+
+DEFAULT_ARROW_COLOR = "C1"
 
 
 def normal_dist_str(mean, std):
@@ -31,9 +35,76 @@ class NamedPlotResult:
     plot: PlotResult
 
 
+def save_ks_test_example_plot() -> PlotResult:
+    text_fontsize = 12
+    KS_MAX_TEXT_HORIZONTAL_MARGIN = 0.05
+    KS_MAX_TEXT_PLACING_FACTOR = 0.75  # set the vertical text position of the KS Test Result in between the arrow [0,1]
+
+    np.random.seed(42)
+    n, m = 500, 600
+    norm_mean_1, norm_std_1 = 0, 1
+    d1 = np.random.normal(norm_mean_1, norm_std_1, n)
+    unif_start, unif_end = -3, 4
+    d2 = np.random.uniform(unif_start, unif_end, m)
+
+    fig, ax = plt.subplots(ncols=1, nrows=1)
+
+    # ax.set_title('Violin-Plot')
+    ax.set_ylabel(r"$\displaystyle{F(x)}$")
+    ax.set_xlabel(r"$\displaystyle{x}$")
+
+    ecdf1 = ECDF(d1)
+    ecdf2 = ECDF(d2)
+
+    d1.sort()
+    d2.sort()
+    F1 = ecdf1(d1)
+    F2 = ecdf2(d2)
+
+    data_all = sorted(np.concatenate([d1, d2]))
+
+    cdf1 = np.searchsorted(d1, data_all, side='right') / n
+    cdf2 = np.searchsorted(d2, data_all, side='right') / m
+    max_s, idx = None, None
+    for p in range(len(data_all)):
+        diff = cdf1[p] - cdf2[p]
+        if max_s is None or diff > max_s:
+            max_s = diff
+            idx = p
+
+    x = data_all[idx]
+    y1 = cdf1[idx]
+    y2 = cdf2[idx]
+
+    ax.step(d1, F1, where="post", label=r"$\displaystyle{F_{1,n}(x)}\;\text{für}\;X_{1}\sim"+normal_dist_str(norm_mean_1, norm_std_1)+r",\,n=\left\lvert X_{1} \right\rvert = "+str(n)+"$")
+    ax.step(d2, F2, where="post", label=r"$\displaystyle{F_{2,m}(x)}\;\text{für}\;X_{2}\sim"+unif_dist_str(unif_start, unif_end)+r",\,n=\left\lvert X_{2} \right\rvert = "+str(m)+"$")
+    ax.annotate("",
+                xy=(x, y1),
+                xytext=(x, y2),
+                arrowprops=dict(arrowstyle="<->", color="k")
+                )
+    ax.text(
+        x=x+KS_MAX_TEXT_HORIZONTAL_MARGIN,
+        y=(min(y1, y2) + abs(y2 - y1) * KS_MAX_TEXT_PLACING_FACTOR),
+        s=r"$\displaystyle{D_{n,m}=" + "{:.2f}".format(max_s)+"}$",
+        horizontalalignment='left',
+        verticalalignment='center',
+        fontsize=text_fontsize,
+    )
+    ax.legend(loc="best")
+
+    ks_xy = ks2_test(d1, d2)
+    crit_xy = ks2_critical_value(d1, d2, 0.05)
+
+    print(f"{ks_xy=}")
+    print(f"{crit_xy=}")
+
+    return PlotResult(fig, ax)
+
+
 def save_timeseries_plot() -> PlotResult:
     np.random.seed(0)
-    n = 365*4
+    n = 365 * 4
     dates = np.array('2022-01-01', dtype=np.datetime64) + np.arange(n)
     data = 20 * np.sin(2 * np.pi * np.arange(n) / 365) + np.random.normal(5, 2, n)
     df = pd.DataFrame({'data': data}, index=dates)
@@ -190,8 +261,8 @@ def save_box_vs_violinplot() -> PlotResult:
             transform=ax1.transAxes,
         )
         text_offset = 0.035 * len(text)
-        ax1.annotate("", xy=(x_poses[0], y_pos), xytext=(x_max - text_offset, y_pos), arrowprops=dict(arrowstyle="->", color="C1"))
-        ax2.annotate("", xy=(x_poses[1], y_pos), xytext=(-x_max + text_offset, y_pos), arrowprops=dict(arrowstyle="->", color="C1"))
+        ax1.annotate("", xy=(x_poses[0], y_pos), xytext=(x_max - text_offset, y_pos), arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR))
+        ax2.annotate("", xy=(x_poses[1], y_pos), xytext=(-x_max + text_offset, y_pos), arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR))
 
     draw_desc("Ausreißer", whisker_high + 4, (0.05, -0.02))
     draw_desc("oberer Whisker", whisker_high - 1.8, (0.2, -0.02))
@@ -230,28 +301,30 @@ if __name__ == '__main__':
     metrics_folder = generated_images_folder.joinpath(f"metrics")
     metrics_folder.mkdir(parents=True, exist_ok=True)
 
-    violin_plot_res = save_box_vs_violinplot()
-    violin_plot_res.fig.show()
-    violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
+    # violin_plot_res = save_box_vs_violinplot()
+    # violin_plot_res.fig.show()
+    # violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
+    #
+    # histogram_res_default = save_histogram()
+    # histogram_res_default.fig.show()
+    # histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
+    #
+    # histogram_res_normed = save_histogram(True)
+    # histogram_res_normed.fig.show()
+    # histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
+    #
+    # qq_plot_defaults_res = save_qq_plot_defaults()
+    # for res in qq_plot_defaults_res:
+    #     res.plot.show()
+    #     res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
+    # qq_plot_norm = save_qq_plot_norm_vs_norm()
+    # qq_plot_norm.show()
+    # qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
+    #
+    # timeseries_decomposition_res = save_timeseries_plot()
+    # timeseries_decomposition_res.fig.show()
+    # timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
 
-    histogram_res_default = save_histogram()
-    histogram_res_default.fig.show()
-    histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
-
-    histogram_res_normed = save_histogram(True)
-    histogram_res_normed.fig.show()
-    histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
-
-    qq_plot_defaults_res = save_qq_plot_defaults()
-    for res in qq_plot_defaults_res:
-        res.plot.show()
-        res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
-    qq_plot_norm = save_qq_plot_norm_vs_norm()
-    qq_plot_norm.show()
-    qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
-
-    timeseries_decomposition_res = save_timeseries_plot()
-    timeseries_decomposition_res.fig.show()
-    timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
-
-
+    ks_test_example_plot_res = save_ks_test_example_plot()
+    ks_test_example_plot_res.fig.show()
+    ks_test_example_plot_res.fig.savefig(metrics_folder / f"ks_test_example_plot.pdf", bbox_inches='tight', pad_inches=0)
