@@ -301,29 +301,29 @@ if __name__ == '__main__':
     metrics_folder = generated_images_folder.joinpath(f"metrics")
     metrics_folder.mkdir(parents=True, exist_ok=True)
 
-    # violin_plot_res = save_box_vs_violinplot()
-    # violin_plot_res.fig.show()
-    # violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
-    #
-    # histogram_res_default = save_histogram()
-    # histogram_res_default.fig.show()
-    # histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
-    #
-    # histogram_res_normed = save_histogram(True)
-    # histogram_res_normed.fig.show()
-    # histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
-    #
-    # qq_plot_defaults_res = save_qq_plot_defaults()
-    # for res in qq_plot_defaults_res:
-    #     res.plot.show()
-    #     res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
-    # qq_plot_norm = save_qq_plot_norm_vs_norm()
-    # qq_plot_norm.show()
-    # qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
-    #
-    # timeseries_decomposition_res = save_timeseries_plot()
-    # timeseries_decomposition_res.fig.show()
-    # timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
+    violin_plot_res = save_box_vs_violinplot()
+    violin_plot_res.fig.show()
+    violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
+
+    histogram_res_default = save_histogram()
+    histogram_res_default.fig.show()
+    histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
+
+    histogram_res_normed = save_histogram(True)
+    histogram_res_normed.fig.show()
+    histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
+
+    qq_plot_defaults_res = save_qq_plot_defaults()
+    for res in qq_plot_defaults_res:
+        res.plot.show()
+        res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
+    qq_plot_norm = save_qq_plot_norm_vs_norm()
+    qq_plot_norm.show()
+    qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
+
+    timeseries_decomposition_res = save_timeseries_plot()
+    timeseries_decomposition_res.fig.show()
+    timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
 
     ks_test_example_plot_res = save_ks_test_example_plot()
     ks_test_example_plot_res.fig.show()
