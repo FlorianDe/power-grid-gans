@@ -65,7 +65,8 @@ def draw_best_fit_plot(
         best_score_finder: Callable[[list[DistributionFit]], DistributionFit] = max,
         distribution_legend_label_provider_fn: Callable[[DistributionFit, str], str] = default_distribution_legend_label_provider,
         translations: Optional[dict[__Keys, str]] = None,
-        distribution_names: Optional[list[str]] = None
+        distribution_names: Optional[list[str]] = None,
+        plot: Optional[PlotResult] = None
 ) -> DistributionFitPlotResult:
     def translate(key: __Keys) -> str:
         return translations[key] if translations is not None else __PLOT_DICT[key][plot_metadata.plot_options.locale]
@@ -76,8 +77,8 @@ def draw_best_fit_plot(
     if plot_metadata.drop_na_values is True:
         data = data.dropna()
 
-    # Create subfig
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+    # Create subplot or use passed plot
+    fig, ax = plt.subplots(nrows=1, ncols=1) if plot is None else plot
 
     print(f"{plot_metadata=}")
     # Plot data pdf

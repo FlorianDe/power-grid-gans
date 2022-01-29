@@ -1,4 +1,5 @@
 import seaborn as sns
+from matplotlib import pyplot as plt
 
 from data.distribution.distribution_fit import DistributionFit
 from experiments.utils import get_experiments_folder, set_latex_plot_params
@@ -6,7 +7,7 @@ from metrics.r_squared import r_squared
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter, WeatherDataColumns, WEATHER_DATA_MAPPING, DEFAULT_DATA_START_DATE
 from src.data.weather.weather_filters import exclude_night_time_values
 from src.plots.distribution_fit_plot import DistributionPlotColumn, draw_best_fit_plot, default_distribution_legend_label_provider, __Keys
-from src.plots.typing import PlotOptions
+from src.plots.typing import PlotOptions, PlotResult
 
 # Already fitted the data against all possible distributions but these are the ones which were used, specify them to speed up rerenderings!
 distribution_names = [
@@ -104,6 +105,8 @@ if __name__ == '__main__':
         for idx, column_plot_metadata in enumerate(column_plot_metadata_entries):
             if column_plot_metadata.transformer is not None:
                 data = column_plot_metadata.transformer(data)
+            margin=0.5
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.4+margin, 4.8+margin))
             fit_res = draw_best_fit_plot(
                 data=data,
                 plot_metadata=column_plot_metadata,
@@ -111,7 +114,8 @@ if __name__ == '__main__':
                 best_score_finder=max,
                 distribution_legend_label_provider_fn=latex_distribution_legend_label_provider,
                 translations=latex_de_translations,
-                distribution_names=distribution_names
+                distribution_names=distribution_names,
+                plot=PlotResult(fig, ax)
             )
             # save file
             path = explore_dists_folder.joinpath(f"{target_column}_{idx}.pdf").absolute()
