@@ -9,8 +9,7 @@ from scipy.stats import distributions
 from statsmodels.distributions import ECDF
 from statsmodels.tsa.seasonal import STL
 
-from experiments.image_generation.utils import set_latex_plot_params
-from experiments.utils import get_experiments_folder
+from experiments.utils import set_latex_plot_params, get_experiments_folder
 from plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
 from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData

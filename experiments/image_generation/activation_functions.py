@@ -7,7 +7,8 @@ import torch
 from matplotlib import pyplot as plt
 from torch import Tensor, nn
 
-from experiments.image_generation.utils import get_generated_images_path_folder, set_latex_plot_params
+from experiments.image_generation.utils import get_generated_images_path_folder
+from experiments.utils import set_latex_plot_params
 
 from src.plots.typing import PlotOptions, PlotResult
 

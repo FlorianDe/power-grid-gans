@@ -1,14 +1,42 @@
 import seaborn as sns
 
-from experiments.utils import get_experiments_folder
+from data.distribution.distribution_fit import DistributionFit
+from experiments.utils import get_experiments_folder, set_latex_plot_params
+from metrics.r_squared import r_squared
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter, WeatherDataColumns, WEATHER_DATA_MAPPING, DEFAULT_DATA_START_DATE
 from src.data.weather.weather_filters import exclude_night_time_values
-from src.plots.distribution_fit_plot import DistributionPlotColumn, draw_best_fit_plot
+from src.plots.distribution_fit_plot import DistributionPlotColumn, draw_best_fit_plot, default_distribution_legend_label_provider, __Keys
 from src.plots.typing import PlotOptions
+
+# Already fitted the data against all possible distributions but these are the ones which were used, specify them to speed up rerenderings!
+distribution_names = [
+    "gennorm",
+    "norm",
+    "triang",
+    "uniform",
+    "burr12",
+    "rayleigh",
+    "alpha",
+    "beta",
+    "chi",
+    "weibull_min",
+    "exponpow",
+]
+
+latex_de_translations: dict[__Keys, str] = {
+    __Keys.LEGEND_DATA_DEFAULT: r"Daten aufgeteilt in {X} Klassen",
+    __Keys.Y_LABEL_DEFAULT: r"Relative Häufigkeitsdichte $P(x)$",
+    __Keys.X_LABEL_DEFAULT: r"Wert"
+}
+
+def latex_distribution_legend_label_provider(fit: DistributionFit, error_label: str) -> str:
+    return default_distribution_legend_label_provider(fit, error_label).replace(r"_", r"\_")
+
 
 if __name__ == '__main__':
     sns.set_theme()
     sns.set_context("paper")
+    set_latex_plot_params()
     explore_dists_root_folder = get_experiments_folder().joinpath("01_explore_data_distributions")
     start_date = DEFAULT_DATA_START_DATE
     end_date = "2019-12-31 23:00:00"
@@ -22,48 +50,48 @@ if __name__ == '__main__':
     # extract all used targetColumns
     target_column_extra_info: dict[str, list[DistributionPlotColumn]] = {
         WeatherDataColumns.T_AIR_DEGREE_CELSIUS: [DistributionPlotColumn(
-            plot_options=PlotOptions(x_label="Temperatur in °C"),
+            plot_options=PlotOptions(x_label=r"Temperatur in $^{\circ}C$"),
             extra_dist_plots=["norm", "gennorm"],
             legend_spacing=True
         )],
         WeatherDataColumns.DH_W_PER_M2: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label="Stundensumme der diffusen Solarstrahlung in W/m²"),
+                plot_options=PlotOptions(x_label=r"Stundensumme der diffusen Solarstrahlung in $\frac{W}{m^2}$"),
                 extra_dist_plots=[],
             ),
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label="Stundensumme der diffusen Solarstrahlung in W/m² (lichter Tag)."),
+                plot_options=PlotOptions(x_label=r"Stundensumme der diffusen Solarstrahlung in $\frac{W}{m^2}$ (lichter Tag)."),
                 extra_dist_plots=["weibull_min", "beta"],
                 transformer=lambda x: exclude_night_time_values(x),
             ),
         ],
         WeatherDataColumns.GH_W_PER_M2: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label="Stundensumme der Globalstrahlung in W/m²"),
+                plot_options=PlotOptions(x_label=r"Stundensumme der Globalstrahlung in $\frac{W}{m^2}$"),
                 extra_dist_plots=[],
             ),
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label="Stundensumme der Globalstrahlung in W/m² (lichter Tag)."),
+                plot_options=PlotOptions(x_label=r"Stundensumme der Globalstrahlung in $\frac{W}{m^2}$ (lichter Tag)."),
                 transformer=lambda x: exclude_night_time_values(x),
                 extra_dist_plots=["weibull_min", "beta"],
             ),
         ],
         WeatherDataColumns.WIND_V_M_PER_S: [DistributionPlotColumn(
-            plot_options=PlotOptions(x_label="Windgeschwindigkeit in m/s"),
+            plot_options=PlotOptions(x_label=r"Windgeschwindigkeit in $\frac{m}{s}$"),
             extra_dist_plots=["rayleigh"],
         )],
         WeatherDataColumns.WIND_DIR_DEGREE: [DistributionPlotColumn(
-            plot_options=PlotOptions(x_label="Windrichtung in Grad (0° - 359°)"),
+            plot_options=PlotOptions(x_label=r"Windrichtung in Grad $(0^{\circ} - 359^{\circ})$"),
             extra_dist_plots=["uniform", "random"],
             bins=36,  # Since 360 degree and only in steps*10
             legend_spacing=True
         )],
         WeatherDataColumns.CLOUD_PERCENT: [DistributionPlotColumn(
-            plot_options=PlotOptions(x_label="Prozentuale Wolkenbedeckung in %"),
+            plot_options=PlotOptions(x_label=r"Prozentuale Wolkenbedeckung in \%"),
             extra_dist_plots=[]
         )],
         WeatherDataColumns.SUN_HOURS_MIN_PER_H: [DistributionPlotColumn(
-            plot_options=PlotOptions(x_label="Sonnenstunden min/h"),
+            plot_options=PlotOptions(x_label=r"Sonnenstunden $\frac{min}{h}$"),
             extra_dist_plots=[]
         )],
     }
@@ -79,6 +107,11 @@ if __name__ == '__main__':
             fit_res = draw_best_fit_plot(
                 data=data,
                 plot_metadata=column_plot_metadata,
+                error_fn=("$R^2$", r_squared),
+                best_score_finder=max,
+                distribution_legend_label_provider_fn=latex_distribution_legend_label_provider,
+                translations=latex_de_translations,
+                distribution_names=distribution_names
             )
             # save file
             path = explore_dists_folder.joinpath(f"{target_column}_{idx}.pdf").absolute()

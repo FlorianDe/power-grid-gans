@@ -1,7 +1,7 @@
 import sys
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -35,17 +35,19 @@ def test_fit_against_all_distributions(
         data: npt.ArrayLike,
         bins: int,
         error_fn: Callable[[npt.ArrayLike, npt.ArrayLike], float],
+        distribution_names: Optional[list[str]] = None
 ) -> list[DistributionFit]:
     """Model data by finding best fit distribution to data"""
+    if distribution_names is None:
+        distribution_names = _distn_names
 
     # Get histogram of original data
     y, x = np.histogram(data, bins=bins, density=True)
     x = (x + np.roll(x, -1))[:-1] / 2.0
 
     fitted_distributions: list[DistributionFit] = []
-
-    for idx, distribution_name in enumerate([d for d in _distn_names if d not in ['levy_stable', 'studentized_range', 'vonmises']]):
-        print("{:>3} / {:<3}: {}".format(idx + 1, len(_distn_names), distribution_name))
+    for idx, distribution_name in enumerate([d for d in distribution_names if d not in ['levy_stable', 'studentized_range', 'vonmises']]):
+        print("{:>3} / {:<3}: {}".format(idx + 1, len(distribution_names), distribution_name))
 
         distribution = getattr(st, distribution_name)
 
