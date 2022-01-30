@@ -1,4 +1,5 @@
 import functools
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -10,14 +11,17 @@ from statsmodels.distributions import ECDF
 from statsmodels.tsa.seasonal import STL
 
 from experiments.utils import set_latex_plot_params, get_experiments_folder
-from plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
 from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
+from src.metrics.kullback_leibler import kl_divergence, __calculate_kl_divergence_terms
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData
 from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
+from src.plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
 from src.plots.typing import PlotResult, PlotOptions, PlotData
 from src.utils.math_utils import LinearIntervalScaler
 
+DEFAULT_TIGHT_LAYOUT_PADDING = 2
 DEFAULT_ARROW_COLOR = "C1"
+DEFAULT_ALPHA = 0.5
 
 
 def normal_dist_str(mean, std):
@@ -32,6 +36,83 @@ def unif_dist_str(unif_start, unif_end):
 class NamedPlotResult:
     name: str
     plot: PlotResult
+
+
+def save_kl_divergence_example_plot() -> PlotResult:
+    text_fontsize = 12
+
+    sns.set_theme()
+    sns.set_context("paper")
+    set_latex_plot_params()
+
+    base = math.e
+    base_mappings = {
+        math.e: "nits",
+        2: "bits"
+    }
+
+    np.random.seed(42)
+    norm_mean_1, norm_std_1 = 0, 1
+    norm_mean_2, norm_std_2 = 1, 1.2
+
+    n = 100
+    min_x, max_x = -4, 6
+    sample_points = np.linspace(min_x, max_x, n)
+
+    P_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_1, scale=norm_std_1)
+    Q_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_2, scale=norm_std_2)
+
+    fig, ((ax1, ax2, ax3)) = plt.subplots(ncols=3, nrows=1, figsize=(3 * 4.8, 4.8), sharey='all')
+    ax1.plot(sample_points, P_pdf,
+             label=r"$\displaystyle{P\sim" + normal_dist_str(norm_mean_1, norm_std_1) + r",\,\left\lvert P \right\rvert = " + str(n) + "}$")
+    ax1.plot(sample_points, Q_pdf,
+             label=r"$\displaystyle{Q\sim" + normal_dist_str(norm_mean_2, norm_std_2) + r",\,\left\lvert Q \right\rvert = " + str(n) + "}$")
+    ax1.set_ylabel(r"Relative Häufigkeitsdichte $P(x)$")
+    ax1.set_xlabel(r"$x$")
+    ax1.legend(loc="best")
+
+    D_kl_points_pq = __calculate_kl_divergence_terms(P_pdf, Q_pdf, base)
+    D_kl_pq = kl_divergence(P_pdf, Q_pdf, base)
+    ax2.plot(sample_points, D_kl_points_pq)
+    ax2.fill_between(x=sample_points, y1=D_kl_points_pq, alpha=DEFAULT_ALPHA)
+    ax2.set_xlabel(r"$x$")
+
+    D_kl_points_qp = __calculate_kl_divergence_terms(Q_pdf, P_pdf, base)
+    D_kl_qp = kl_divergence(Q_pdf, P_pdf, base)
+    ax3.plot(sample_points, D_kl_points_qp)
+    ax3.fill_between(x=sample_points, y1=D_kl_points_qp, alpha=DEFAULT_ALPHA)
+    ax3.set_xlabel(r"$x$")
+
+    def create_KL_score_text(KL_fn_name: str, score: float) -> str:
+        return r"$\displaystyle{" + KL_fn_name + "=" + "{:.3f}".format(score) + r"\;\text{" + base_mappings[base] + "}" + "}$"
+
+    text_x_pos = min_x + (max_x - min_x) / 2
+    text_y_pos_offset = 0.01
+    text_y_pos = max(max(D_kl_points_qp), max(D_kl_points_pq)) + text_y_pos_offset
+    ax2.text(
+        x=text_x_pos,
+        y=text_y_pos,
+        s=create_KL_score_text(r"D_{KL_e}(P\,\Vert\,Q)", D_kl_pq),
+        horizontalalignment='center',
+        verticalalignment='bottom',
+        fontsize=text_fontsize,
+    )
+
+    ax3.text(
+        x=text_x_pos,
+        y=text_y_pos,
+        s=create_KL_score_text(r"D_{KL_e}(Q\,\Vert\,P)", D_kl_qp),
+        horizontalalignment='center',
+        verticalalignment='bottom',
+        fontsize=text_fontsize,
+    )
+
+    print(f"{D_kl_pq=}")
+    print(f"{D_kl_qp=}")
+
+    fig.tight_layout(pad=DEFAULT_TIGHT_LAYOUT_PADDING)
+
+    return PlotResult(fig, ax1)
 
 
 def save_ks_test_example_plot() -> PlotResult:
@@ -75,17 +156,22 @@ def save_ks_test_example_plot() -> PlotResult:
     y1 = cdf1[idx]
     y2 = cdf2[idx]
 
-    ax.step(d1, F1, where="post", label=r"$\displaystyle{F_{1,n}(x)}\;\text{für}\;X_{1}\sim"+normal_dist_str(norm_mean_1, norm_std_1)+r",\,n=\left\lvert X_{1} \right\rvert = "+str(n)+"$")
-    ax.step(d2, F2, where="post", label=r"$\displaystyle{F_{2,m}(x)}\;\text{für}\;X_{2}\sim"+unif_dist_str(unif_start, unif_end)+r",\,n=\left\lvert X_{2} \right\rvert = "+str(m)+"$")
+    ax.step(d1, F1,
+            where="post",
+            label=r"$\displaystyle{F_{1,n}(x)}\;\text{für}\;X_{1}\sim" + normal_dist_str(norm_mean_1, norm_std_1) + r",\,n=\left\lvert X_{1} \right\rvert = " + str(n) + "$")
+    ax.step(d2, F2,
+            where="post",
+            label=r"$\displaystyle{F_{2,m}(x)}\;\text{für}\;X_{2}\sim" + unif_dist_str(unif_start, unif_end) + r",\,m=\left\lvert X_{2} \right\rvert = " + str(m) + "$"
+            )
     ax.annotate("",
                 xy=(x, y1),
                 xytext=(x, y2),
                 arrowprops=dict(arrowstyle="<->", color="k")
                 )
     ax.text(
-        x=x+KS_MAX_TEXT_HORIZONTAL_MARGIN,
+        x=x + KS_MAX_TEXT_HORIZONTAL_MARGIN,
         y=(min(y1, y2) + abs(y2 - y1) * KS_MAX_TEXT_PLACING_FACTOR),
-        s=r"$\displaystyle{D_{n,m}=" + "{:.2f}".format(max_s)+"}$",
+        s=r"$\displaystyle{D_{n,m}=" + "{:.2f}".format(max_s) + "}$",
         horizontalalignment='left',
         verticalalignment='center',
         fontsize=text_fontsize,
@@ -327,3 +413,7 @@ if __name__ == '__main__':
     ks_test_example_plot_res = save_ks_test_example_plot()
     ks_test_example_plot_res.fig.show()
     ks_test_example_plot_res.fig.savefig(metrics_folder / f"ks_test_example_plot.pdf", bbox_inches='tight', pad_inches=0)
+
+    kl_divergence_example_res = save_kl_divergence_example_plot()
+    kl_divergence_example_res.fig.show()
+    kl_divergence_example_res.fig.savefig(metrics_folder / f"kl_divergence_example_plot.pdf", bbox_inches='tight', pad_inches=0)
