@@ -92,7 +92,7 @@ def save_kl_divergence_example_plot() -> PlotResult:
     ax2.text(
         x=text_x_pos,
         y=text_y_pos,
-        s=create_KL_score_text(r"D_{KL_e}(P\,\Vert\,Q)", D_kl_pq),
+        s=create_KL_score_text(r"D_{\text{KL}_e}(P\,\Vert\,Q)", D_kl_pq),
         horizontalalignment='center',
         verticalalignment='bottom',
         fontsize=text_fontsize,
@@ -101,7 +101,7 @@ def save_kl_divergence_example_plot() -> PlotResult:
     ax3.text(
         x=text_x_pos,
         y=text_y_pos,
-        s=create_KL_score_text(r"D_{KL_e}(Q\,\Vert\,P)", D_kl_qp),
+        s=create_KL_score_text(r"D_{\text{KL}_e}(Q\,\Vert\,P)", D_kl_qp),
         horizontalalignment='center',
         verticalalignment='bottom',
         fontsize=text_fontsize,
