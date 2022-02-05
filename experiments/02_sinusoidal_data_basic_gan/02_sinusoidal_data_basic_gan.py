@@ -1,3 +1,5 @@
+import math
+
 import seaborn as sns
 
 import numpy as np
@@ -10,9 +12,9 @@ from datetime import datetime
 from torch.optim.lr_scheduler import StepLR
 
 from experiments.utils import get_experiments_folder
-from gan.discriminator.basic_discriminator import BasicDiscriminator
-from gan.generator.basic_generator import BasicGenerator
-from gan.trainer.vanilla_gan_trainer import VanillaGANTrainer
+from src.gan.discriminator.basic_discriminator import BasicDiscriminator
+from src.gan.generator.basic_generator import BasicGenerator
+from src.gan.trainer.vanilla_gan_trainer import VanillaGANTrainer
 from src.gan.discriminator.cnn_discriminator import CNNDiscriminator
 from src.gan.generator.cnn_generator import CNNGenerator
 from src.gan.trainer.cgan_trainer import CGANTrainer
@@ -29,14 +31,18 @@ from src.metrics.r_squared import r_squared
 from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 from src.data.typing import Feature
 from src.data.data_holder import DataHolder
-from src.data.synthetical.sinusoidal import generate_sinusoidal_time_series
+from src.data.synthetical.sinusoidal import generate_sinusoidal_time_series, TrigFuncParameters
 from src.evaluator.evaluator import Evaluator
 from src.gan.trainer.typing import TrainModel
-from src.utils.datetime_utils import convert_input_str_to_date, dates_to_conditional_vectors, format_timestamp
-from src.utils.plot_utils import plot_dfs
+from src.utils.datetime_utils import convert_input_str_to_date, dates_to_conditional_vectors
 from src.utils.pandas_utils import get_datetime_values
 
-from torchsummary import summary
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
 
 if __name__ == '__main__':
     sns.set_theme()
@@ -49,49 +55,57 @@ if __name__ == '__main__':
 
     SEED = 1337
     epochs = 1000
-    noise_vector_size = 20
-    sequence_length = 24*50
-    batch_size = 1  # 24
+    noise_vector_size = 1
+    sequence_length = 24
+    samples_len = sequence_length*7
+    batch_size = 5
     features = 1
     start_date: str = '2020.01.01'
-    end_date: str = '2020.01.01' # 10.01
+    end_date: str = '2020.01.01'
 
-    samples_len = sequence_length
     samples = generate_sinusoidal_time_series(
         sample_count=1,
         series_length=samples_len,
         dimensions=features,
         seed=SEED,
         func=np.sin,
-        normalize=False
+        normalize=False,
+        trig_parameters=TrigFuncParameters(2*math.pi/24, 0, 1)
     )
     input_data = samples[0].astype(np.float32)
     feature_labels = [Feature("Sin value") for i in range(features)]
     dates = pd.date_range(start='01/01/2021', freq="h", periods=samples_len)
     data_holder = DataHolder(
-        data=input_data,
+        data=np.array(list(chunks(input_data, sequence_length))),
         data_labels=feature_labels,
-        dates=np.array(dates_to_conditional_vectors(*get_datetime_values(dates)))
+        dates=np.array(list(chunks(np.array(dates_to_conditional_vectors(*get_datetime_values(dates))), sequence_length)))
     )
 
-    G_net = CNNGenerator(input_size=noise_vector_size, out_size=features)
-    # G_net = BasicGenerator(input_size=noise_vector_size, out_size=sequence_length * features, hidden_layers=[256, 512, 1024, 512])
-    G_optim = torch.optim.Adam(G_net.parameters(), lr=0.003, betas=(0.9, 0.999))
+    # G_net = CNNGenerator(input_size=noise_vector_size, out_size=features)
+    G_net = BasicGenerator(input_size=noise_vector_size, out_size=sequence_length * features, hidden_layers=[256, 512, 1024, 512])
+    G_optim = torch.optim.Adam(G_net.parameters(), lr=1e-2, betas=(0.9, 0.999))
     G_sched = None # StepLR(G_optim, step_size=30, gamma=0.1)
     G = TrainModel(G_net, G_optim, G_sched)
 
-    D_net = CNNDiscriminator(input_size=features, out_size=1)
-    # D_net = BasicDiscriminator(input_size=sequence_length * features, out_size=1, hidden_layers=[1024, 512, 256])
-    D_optim = torch.optim.Adam(D_net.parameters(), lr=0.003, betas=(0.9, 0.999))
+    # D_net = CNNDiscriminator(input_size=features, out_size=1)
+    D_net = BasicDiscriminator(input_size=sequence_length * features, out_size=1, hidden_layers=[1024, 512, 256])
+    D_optim = torch.optim.Adam(D_net.parameters(), lr=1e-2, betas=(0.9, 0.999))
     D_sched = None # StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)
 
-    summary(G_net, (features, noise_vector_size))
-    summary(D_net, (features, sequence_length))
+    # summary(G_net, (features, noise_vector_size))
+    # summary(D_net, (features, sequence_length))
 
-    gan_trainer = VanillaGANTrainer(G, D, data_holder, noise_vector_size, sequence_length, batch_size, 'cpu')
+    gan_trainer = VanillaGANTrainer(
+        generator=G,
+        discriminator=D,
+        data_holder=data_holder,
+        noise_vector_size=noise_vector_size,
+        sequence_length=sequence_length,
+        batch_size=batch_size,
+        device='cpu'
+    )
     gan_trainer.train(epochs)
-
 
     # G_net = BasicGenerator(input_size=noise_vector_size + 14, out_size=features, hidden_layers=[256, 512, 1024, 512])
     # G_optim = torch.optim.Adam(G_net.parameters(), lr=0.003, betas=(0.9, 0.999))
