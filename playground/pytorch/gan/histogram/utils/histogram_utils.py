@@ -38,8 +38,8 @@ def generate_noisy_normal_distribution(
 ):
     if random_seed:
         np.random.seed(random_seed)
-    x = np.linspace(-0.5, 0.5, sample_size)
-    p = norm.pdf(x, mu, sigma)
+    x = np.linspace(-0.5, 1.5, sample_size)
+    p = norm.pdf(x, mu, sigma) + norm.pdf(x, mu+1, sigma)
     noise = np.random.normal(0, 1, sample_size) * noise_scale
     p = p + noise
     clipped = np.clip(p, 0, np.max(p))

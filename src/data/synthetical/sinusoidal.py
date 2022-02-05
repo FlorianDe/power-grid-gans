@@ -1,17 +1,18 @@
+import math
 from typing import Optional, Callable
 
 import numpy as np
 import numpy.typing as npt
 from attr import dataclass
 from matplotlib import pyplot as plt
-from scipy import signal, optimize
+from scipy import optimize
 
 
 @dataclass
 class TrigFuncParameters:
-    frequency: float
-    phase: float
-    amplitude: float = 1
+    frequency: Optional[float] = None
+    phase: Optional[float] = None
+    amplitude: Optional[float] = None
 
 
 def __calculate_trigonometric_input(steps: npt.ArrayLike, frequency: float, phase: float) -> npt.ArrayLike:
@@ -24,7 +25,8 @@ def generate_sinusoidal_time_series(sample_count: int,
                                     seed: Optional[int] = None,
                                     func: Callable[[npt.ArrayLike], npt.ArrayLike] = np.sin,
                                     norm_max_value: float = None,
-                                    normalize: bool = True
+                                    normalize: bool = True,
+                                    trig_parameters: TrigFuncParameters = TrigFuncParameters()
                                     ):
     """Sine data generation.
 
@@ -57,9 +59,10 @@ def generate_sinusoidal_time_series(sample_count: int,
         for d in range(dimensions):
             # Randomly drawn frequency and phase
             trig_params = TrigFuncParameters(
-                frequency=np.random.uniform(0, 0.1),
-                phase=np.random.uniform(0, 0.1),
-                amplitude=1  # We can just use 1 for now since we are normalizing nonetheless
+                frequency=trig_parameters.frequency if trig_parameters.frequency is not None else np.random.uniform(0, 0.1),
+                phase=trig_parameters.phase if trig_parameters.phase is not None else np.random.uniform(0, 0.1),
+                amplitude=trig_parameters.amplitude if trig_parameters.amplitude is not None else  np.random.uniform(0, 1)
+                # We can just use 1 for now since we are normalizing nonetheless
             )
 
             # Calculate time series based on the trigonometry function provided with the sampled trigonometry parameters
@@ -96,8 +99,15 @@ def generate_sinusoidal_time_series(sample_count: int,
 
 
 if __name__ == '__main__':
-    seq_len = 1000  # 365 * 24
-    samples = generate_sinusoidal_time_series(1, seq_len, 10, func=np.sin, normalize=True)  # np.sin, np.cos, np.tan, signal.sawtooth, signal.square
+    seq_len = 24  # 365 * 24
+    samples = generate_sinusoidal_time_series(
+        sample_count=1,
+        series_length=seq_len,
+        dimensions=3,
+        func=np.sin,
+        normalize=False,
+        trig_parameters=TrigFuncParameters(2*math.pi/24, 0)
+    )  # np.sin, np.cos, np.tan, signal.sawtooth, signal.square
     for sample_idx in range(len(samples)):
         feature_series = np.transpose(samples[sample_idx])
         for feature_idx in range(len(feature_series)):

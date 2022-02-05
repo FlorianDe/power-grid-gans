@@ -6,6 +6,8 @@ from tensorboardX import SummaryWriter
 
 from models.discriminator.rnn_hist_disc import RNNHistogramDiscriminator
 from models.generator.rnn_hist_gen import RNNHistogramGenerator
+from playground.pytorch.gan.histogram.models.discriminator.cnn_hist_disc import CNNHistogramDiscriminator
+from playground.pytorch.gan.histogram.models.generator.cnn_hist_gen import CNNHistogramGenerator
 from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
 from utils.histogram_utils import generate_noisy_normal_distribution
 
@@ -28,7 +30,7 @@ if __name__ == "__main__":
     # ).to(device)
     net_discr = RNNHistogramDiscriminator(input_size=HISTOGRAM_SIZE, num_layers=3, hidden_size=100).to(device)
     net_gener = RNNHistogramGenerator(noise_vector_size=NOISE_VECTOR_SIZE, rnn_layers=24, rnn_hidden_size=100,
-                                      gen_features_out=HISTOGRAM_SIZE, ).to(device)
+                                      gen_features_out=HISTOGRAM_SIZE ).to(device)
 
     objective = nn.BCELoss()
     gen_optimizer = optim.Adam(
@@ -58,7 +60,7 @@ if __name__ == "__main__":
 
         # fake samples, input is 3D: batch, filters, x
         gen_input_v = torch.FloatTensor(BATCH_SIZE, 1, NOISE_VECTOR_SIZE)
-        gen_input_v.normal_(0, 1)
+        gen_input_v.random_(0, 1)
         gen_output_v = net_gener(gen_input_v)
 
         # # train discriminator

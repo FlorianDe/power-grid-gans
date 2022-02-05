@@ -1,6 +1,6 @@
 import torch
 
-from test.utils import LOG
+from playground.utils import LOG
 
 if __name__ == "__main__":
     LOG.info(f'Cuda support available: {torch.cuda.is_available():}')
