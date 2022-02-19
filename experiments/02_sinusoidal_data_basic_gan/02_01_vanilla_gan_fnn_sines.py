@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from configparser import NoSectionError
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import reduce
 from pathlib import PurePath
@@ -7,6 +8,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from tqdm import tqdm
+import seaborn as sns
 
 import random
 import math
@@ -46,6 +48,15 @@ __PLOT_DICT: dict[SimpleGanPlotResultColumns, dict[Locale, str]] = {
 def translate(key: SimpleGanPlotResultColumns) -> str:
     return __PLOT_DICT[key][PLOT_LANG]
 
+@dataclass
+class SineGenerationParameters:
+    sequence_len: int
+    amplitudes: list[float] = field(default_factory=lambda: [1])
+    times: int = 1
+    noise_scale: float = 0.05
+
+    def __iter__(self):
+        return iter((self.sequence_len, self.amplitudes, self.times, self.noise_scale))
 
 @dataclass
 class TrainParameters:
@@ -185,20 +196,22 @@ class GeneratorCNN(nn.Module):
 
 
 def generate_sine_features(
-    sequence_len: int, amplitudes: list[float] = [1], times: int = 1, noise_scale: float = 0.05, seed: int = 42
+    params: SineGenerationParameters, seed: int = 42
 ) -> tuple[Tensor, Tensor]:
     """
     Returns a multi dimensional sine wave feature of shape [times, sequence_len, features]
     """
+    sequence_len, amplitudes, times, noise_scale = params
     torch.manual_seed(seed)
 
     features = len(amplitudes)
     a = torch.tensor(amplitudes).view(1, features)
-    x = torch.linspace(0, sequence_len, sequence_len).view(sequence_len, 1).repeat(times, 1)
+    # x = torch.linspace(0, sequence_len, sequence_len).view(sequence_len, 1).repeat(times, 1)
+    x = torch.arange(sequence_len).view(sequence_len, 1).repeat(times, 1)
     sine = torch.sin((2 * math.pi / sequence_len) * x)
     scaled_sines = (sine * a).view(times, sequence_len, features)
-    # noises = noise_scale * (2 * torch.rand(scaled_sines.shape) - torch.ones(scaled_sines.shape))
-    noises = noise_scale * torch.randn(scaled_sines.shape)
+    # noises = noise_scale * (2 * torch.rand(scaled_sines.shape) - torch.ones(scaled_sines.shape))   # scaled Uniform dist noise
+    noises = noise_scale * torch.randn(scaled_sines.shape)  # scaled Normal dist noise
 
     return scaled_sines + noises
 
@@ -207,7 +220,7 @@ def train(
     G: nn.Module,
     D: nn.Module,
     noise_generator: Callable[[TrainParameters], Tensor],
-    samples: list[npt.ArrayLike],
+    samples_parameters: list[SineGenerationParameters],
     params: TrainParameters,
     features_len: int,
     save_path: PurePath,
@@ -222,10 +235,20 @@ def train(
     optimizerD = optim.Adam(D.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
 
-    for i, sample in enumerate(samples):
-        print(f"{i}. {sample.shape}")
-    # # TODO FOR NOW JUST CONCAT THEM!
-    flattened_samples = torch.concat(samples, dim=0)
+    # generate sample data
+    samples = [generate_sine_features(params) for params in samples_parameters]
+
+    # create train test directory
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
+    save_fig(fig, save_path / "train_data_plot")
+
+    print(f"Preparing training data for: {save_path.name}")
+    print(f"Start training with samples:")
+    for i, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
+        print(f"{i}. sample s{sample.shape} with params: {sample_params}")
+    flattened_samples = torch.concat(samples, dim=0)  # TODO FOR NOW JUST CONCAT THEM!
     print(f"{flattened_samples.shape=}")
     dataloader = DataLoader(
         flattened_samples,
@@ -244,11 +267,10 @@ def train(
         for batch_idx, (data_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
             # TODO PREPARE DATA FOR SPECIFIC NETS
-            # data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
-            # CNN PREPARATION # TODO CHECK THIS
-            data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len)
+            data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
+
+            # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len)
             # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # TODO CHECK THIS
-            # print(f"{data_batch.shape=}")
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -327,7 +349,7 @@ def train(
     fig, ax = plot_model_losses(G_losses, D_losses, params)
     save_fig(fig, save_path / f"model_losses_after_{params.epochs}.png")
     plt.close(fig)
-
+    print("End training\n--------------------------------------------")
 
 def save_fig(fig, path):
     fig.savefig(path, bbox_inches="tight", pad_inches=0)
@@ -343,54 +365,78 @@ def plot_sample(sample: Tensor) -> tuple[Axes, Figure]:
     return fig, ax
 
 
-def plot_train_data_overlayed(samples: list[Tensor], params: TrainParameters, features_len: int) -> tuple[Axes, Figure]:
+def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[SineGenerationParameters], params: TrainParameters) -> tuple[Axes, Figure]:
+    if len(samples) != len(samples_parameters):
+        raise ValueError("The specified samples and sample parameters have to have the same length.")
+
+    def create_sample_legend_string(idx: int, samples_parameters: SineGenerationParameters):
+        amplitude_vec = str(sample_params.amplitudes)
+        sequence_len = str(params.sequence_len)
+
+        random_var_name = chr(65+((idx+23) % 26)) # 0 => X, 1 => Y ...
+        eq = r"$"
+        eq += random_var_name
+        eq += r"_{[t]_{"
+        eq += sequence_len
+        eq += r"}} \sim "
+        eq += amplitude_vec
+        if len(sample_params.amplitudes) > 1:
+            eq += r"^{T}"
+        eq += r"*\sin(\frac{2\pi t}{"
+        eq += sequence_len
+        eq += r"})"
+        if samples_parameters.noise_scale != 0:
+            noise_scale = str(sample_params.noise_scale)
+            eq += r" + "
+            eq += noise_scale
+            eq += r" * \mathcal{N}(0,1)"
+        eq += r"$"
+
+        return eq
+    
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
     legends: list[tuple[any, any]] = []
     x = [i for i in range(params.sequence_len)]
-    ax.set_title("Training data")
+    # ax.set_title("Training data")
     sequence_count = sum(sample.size(dim=1) for sample in samples)
     alpha = max(1/sequence_count, 1/255)
-    cmap = plt.cm.viridis
-    for i, sample in enumerate(samples):
-        legends.append(
-            (
-                Line2D([0], [0], color=cmap(i), lw=6), 
-                r"$0.5*\sin(\frac{2\pi t}{" + str(params.sequence_len) + r"}) + 0.01 * \mathcal{N}(0,1)$" # TODO
-            )
-        )
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    cmap = prop_cycle.by_key()['color']
+    marker_line_color = "pink" # cmap[7]
+    marker_color = "lightgrey" # cmap[7]
+    for s_idx, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
+        legends.append((Line2D([0], [0], color=cmap[s_idx], lw=6), create_sample_legend_string(s_idx, sample_params)))
         for sequence in sample:
             t_seq = torch.transpose(sequence, 0, 1)
             for feature in t_seq:
-                # ax.plot(x, feature, color='b', alpha=alpha)
-                ax.step(x, feature, where='mid', color=cmap(i), alpha=alpha, zorder=2)
-    # ax.legend()
+                # ax.plot(x, feature, color=cmap[s_idx], alpha=alpha, zorder=2)
+                ax.step(x, feature, where='mid', color=cmap[s_idx], alpha=alpha, zorder=2, rasterized=True)  # use rasterized here, else the generated pdf gets to complex
 
-    # list_n([times, sequence, features]) -> [n*times, sequence, features]
-    conc_samples = torch.concat(samples, dim=0)
-    # [n*times, sequence, features] -> [sequence, n*times, features]
-    t_samples = torch.transpose(conc_samples, 0, 1)
-    # [sequence, n*times, features] -> [sequence, mean(features)]
-    t_sample_means = torch.mean(t_samples, dim=1)
-    for i, y in enumerate(torch.transpose(t_sample_means, 0, 1)):
-        lin, = ax.plot(x, y, c="grey", lw=2, alpha=.7, linestyle='dashed', zorder=3)
-        # mark, = ax.plot(x, y, marker='_', alpha=1, markersize=12)
-        # plt.scatter(x, y, s=500, c="grey", alpha=1, marker='_', zorder=4)
-        mark, = ax.plot(x, y, color='orange', linestyle='none', marker='_', markerfacecolor='orange', markersize=10, markeredgewidth=2, zorder=4)
-        legends.append(((lin, mark), f'mean feature {i}'))
+    for s_idx, sample in enumerate(samples):
+        # [n*times, sequence, features] -> [sequence, n*times, features]
+        t_samples = torch.transpose(sample, 0, 1)
+        # [sequence, n*times, features] -> [sequence, mean(features)]
+        t_sample_means = torch.mean(t_samples, dim=1)
+        for f_idx, y in enumerate(torch.transpose(t_sample_means, 0, 1)):
+            lin, = ax.plot(x, y, c=marker_line_color, lw=2, alpha=.5, linestyle='dashed', zorder=3, rasterized=True)
+            # mark, = ax.plot(x, y, marker='_', alpha=1, markersize=12)
+            mark, = ax.plot(x, y, linestyle='none', marker='_', markerfacecolor=marker_color, markeredgecolor=marker_color, markersize=10, markeredgewidth=1, zorder=4)
+            # only create a single legend entry
+            if s_idx == 0 and f_idx == 0:
+                legends.append(((lin, mark), r'$E[X_{[t]_{s}}]$'))
 
-    x_labels = ["$t_{" + str(i) + "}$" for i in x]
+    ax.set_rasterization_zorder(2)
+    x_labels = ["$" + str(i) + "$" for i in x]
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels)
-    ax.set_xlabel("t", fontsize=12)
+    ax.set_xlabel("$[t]_{s}$", fontsize=12)
     ax.set_ylabel(            
-        r"$\sin(\frac{2\pi t}{" + str(params.sequence_len) + r"}) + \alpha * \mathcal{N}(0,1)$", fontsize=12
+        r"$X_{[t]_s} \sim \overrightarrow{a} * \sin(\frac{2\pi t}{s}) + \nu * \mathcal{N}(0,1)$", fontsize=12
     )
 
     ax.grid(axis='x', color='0.95')
-
     ax.legend(map(lambda e: e[0], legends), map(lambda e: e[1], legends))
     
-
     return fig, ax
 
 
@@ -458,7 +504,7 @@ def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params
         save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
 
-def setup_fnn_models_and_train(params: TrainParameters, samples: list[Tensor], features_len: int, save_path: PurePath):
+def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
 
     G = GeneratorFNN(
         latent_vector_size=params.latent_vector_size,
@@ -471,7 +517,7 @@ def setup_fnn_models_and_train(params: TrainParameters, samples: list[Tensor], f
         G=G,
         D=D,
         noise_generator=fnn_noise_generator,
-        samples=samples,
+        samples_parameters=samples_parameters,
         params=params,
         features_len=features_len,
         save_path=save_path,
@@ -483,8 +529,6 @@ def train_fnn_single_sample_univariate(params: TrainParameters, sample_batches: 
     """
     This should give us a baseline for the simplest training possible
     """
-    fnn_single_sample_univariate = save_images_path / "fnn_single_sample_univariate"
-    fnn_single_sample_univariate.mkdir(parents=True, exist_ok=True)
     amplitudes = [1.0]
     features_len = len(amplitudes)
     samples: list[Tensor] = [
@@ -493,59 +537,48 @@ def train_fnn_single_sample_univariate(params: TrainParameters, sample_batches: 
         ),
     ]
 
-    setup_fnn_models_and_train(params, samples, features_len, fnn_single_sample_univariate)
+    setup_fnn_models_and_train(params, samples, features_len, save_images_path / "fnn_single_sample_univariate")
 
 
 def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_batches: int):
     """
     Check how it affects the training if we add some noise on top of the training data
     """
-    fnn_noisy_single_sample_univariate = save_images_path / "noisy_single_sample_univariate"
-    fnn_noisy_single_sample_univariate.mkdir(parents=True, exist_ok=True)
     amplitudes = [1.0]
     features_len = len(amplitudes)
-    samples: list[Tensor] = [
-        generate_sine_features(
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.05
         ),
     ]
-
-    setup_fnn_models_and_train(params, samples, features_len, fnn_noisy_single_sample_univariate)
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "noisy_single_sample_univariate")
 
 
 def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
     """
     This should show us that the convergence is not as fast for multiple features!
     """
-    fnn_single_sample_multivariate = save_images_path / "fnn_single_sample_multivariate"
-    fnn_single_sample_multivariate.mkdir(parents=True, exist_ok=True)
     amplitudes = [0.5, 1.0]
     features_len = len(amplitudes)
-    samples: list[Tensor] = [
-        generate_sine_features(
-            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0
-        ),
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0)
     ]
-
-    setup_fnn_models_and_train(params, samples, features_len, fnn_single_sample_multivariate)
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate")
 
 
 def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     """
     This should result in a mode collapse
     """
-    fnn_multiple_sample_univariate = save_images_path / "fnn_multiple_sample_univariate"
-    fnn_multiple_sample_univariate.mkdir(parents=True, exist_ok=True)
     features_len = 1
-    samples: list[Tensor] = [
-        generate_sine_features(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0),
-        generate_sine_features(
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0),
+        SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0
         ),
-        generate_sine_features(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0),
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0),
     ]
-
-    setup_fnn_models_and_train(params, samples, features_len, fnn_multiple_sample_univariate)
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate")
 
 
 def weights_init(m):
@@ -584,8 +617,6 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
     """
     This should give us a baseline for the simplest training possible
     """
-    cnn_single_sample_univariate = save_images_path / "cnn_single_sample_univariate"
-    cnn_single_sample_univariate.mkdir(parents=True, exist_ok=True)
     amplitudes = [1.0]
     features_len = len(amplitudes)
     samples: list[Tensor] = [
@@ -593,51 +624,67 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         )
     ]
-    fig, ax = plot_train_data_overlayed(samples, params, features_len)
-    save_fig(fig, cnn_single_sample_univariate / "train_data_plot")
-
-    return setup_cnn_models_and_train(params, samples, features_len, cnn_single_sample_univariate)
+    return setup_cnn_models_and_train(params, samples, features_len, save_images_path / "cnn_single_sample_univariate")
 
 
 def train_cnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     """
     This should give us a baseline for the simplest training possible
     """
-    cnn_multiple_sample_univariate = save_images_path / "cnn_multiple_sample_univariate"
-    cnn_multiple_sample_univariate.mkdir(parents=True, exist_ok=True)
-    # amplitudes = [1.0]
     features_len = 1
     samples: list[Tensor] = [
         generate_sine_features(
             sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01
         ),
         generate_sine_features(
-            sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0.01
-        ),
-        generate_sine_features(
             sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
         ),
     ]
-    fig, ax = plot_train_data_overlayed(samples, params, features_len)
-    save_fig(fig, cnn_multiple_sample_univariate / "train_data_plot")
 
-    return setup_cnn_models_and_train(params, samples, features_len, cnn_multiple_sample_univariate)
+    return setup_cnn_models_and_train(params, samples, features_len, save_images_path / "cnn_multiple_sample_univariate")
 
+def save_multi_sample_multivariate_training_data_sample_overview(params: TrainParameters):
+    times = 500
+    save_path = save_images_path
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=times, noise_scale=0.05),
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[2, 0.5], times=times, noise_scale=0.01)
+    ]
+    # generate sample data
+    samples = [generate_sine_features(params) for params in samples_parameters]
+
+    # create train test directory
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plot_train_data_overlayed(samples, samples_parameters, params)
+    save_fig(fig, save_path / "train_data_plot.pdf")
+    
 
 if __name__ == "__main__":
+    sns.set_theme()
+    sns.set_context("paper")
+    sns.set_palette("colorblind")
+    set_latex_plot_params()
+
     manualSeed = 1337
     print("Random Seed: ", manualSeed)
     random.seed(manualSeed)
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
-    set_latex_plot_params()
-    train_params = TrainParameters(epochs=50)
-    sample_batches = train_params.batch_size * 500
 
+
+    train_params = TrainParameters(epochs=1)
+    sample_batches = train_params.batch_size * 1
+
+    # save sample image for synthetic test data
+    save_multi_sample_multivariate_training_data_sample_overview(train_params)
+
+    # FNN trainings
     # train_fnn_single_sample_univariate(train_params, sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
     # train_fnn_single_sample_multivariate(train_params, sample_batches)
     # train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
-    train_cnn_single_sample_univariate(train_params, sample_batches)
-    train_cnn_multiple_sample_univariate(train_params, sample_batches)
+    # CNN trainings
+    # train_cnn_single_sample_univariate(train_params, sample_batches)
+    # train_cnn_multiple_sample_univariate(train_params, sample_batches)
