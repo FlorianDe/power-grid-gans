@@ -19,11 +19,11 @@ import numpy.typing as npt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch import Tensor
+from torch import Tensor, dropout
 from torch.utils.data import DataLoader
 
 from experiments.utils import get_experiments_folder, set_latex_plot_params
-from src.plots.typing import Locale
+from src.plots.typing import Locale, PlotResult
 
 PLOT_LANG = Locale.DE
 save_images_path = (
@@ -67,7 +67,10 @@ class TrainParameters:
     device: torch.device = torch.device("cpu")
 
 
-def fnn_noise_generator(current_batch_size: int, params: TrainParameters) -> Tensor:
+def fnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
+    return data_batch.view(batch_size, sequence_len*features_len)
+
+def fnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
     return torch.randn(current_batch_size, params.latent_vector_size, device=params.device)
 
 
@@ -115,8 +118,12 @@ class PrintSize(nn.Module):
         print(x.shape)
         return x
 
+def cnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
+    # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
+    # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
+    return data_batch.view(batch_size, features_len, sequence_len)
 
-def cnn_noise_generator(current_batch_size: int, params: TrainParameters) -> Tensor:
+def cnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
     return torch.randn(current_batch_size, params.latent_vector_size, 1, device=params.device)
 
 
@@ -194,6 +201,85 @@ class GeneratorCNN(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self.main(x)
 
+def rnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
+    return data_batch.view(batch_size, sequence_len, features_len)
+
+def rnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
+    return torch.randn(current_batch_size, features_len, params.latent_vector_size, device=params.device)
+
+class DiscriminatorRNN(nn.Module):
+    def __init__(
+        self,
+        features: int, 
+        sequence_len: int, 
+        out_features: int = 1
+    ):
+        super(DiscriminatorRNN, self).__init__()
+        self.features = features
+        self.sequence_len = sequence_len
+        self.out_features = out_features
+        self.hidden_size = 2*out_features # hardcoded
+        self.num_layers = 1
+        self.rnn = nn.GRU( 
+            input_size = self.features,
+            hidden_size = self.hidden_size,
+            num_layers = self.num_layers,
+            bias = True,
+            batch_first = True,
+            dropout=0.5
+        )
+        self.relu = nn.ReLU()
+        self.fc = nn.Linear(self.hidden_size, self.out_features)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_()
+        out, h = self.rnn(x, h0)
+        out = out[:, -1, :]
+        # out_last = out[:,-1]
+        out = self.fc(self.relu(out))
+        out = self.sigmoid(out)
+        return out
+
+    # def init_hidden(self, batch_size):
+    #     weight = next(self.parameters()).data
+    #     hidden = weight.new(self.num_layers, batch_size, self.hidden_size).zero_()  #.to(device)
+    #     return hidden
+
+class GeneratorRNN(nn.Module):
+    def __init__(
+        self,
+        latent_vector_size: int,
+        features: int,
+        sequence_len: int,
+    ):
+        super(GeneratorRNN, self).__init__()
+        self.latent_vector_size = latent_vector_size
+        self.features = features
+        self.sequence_len = sequence_len
+        self.num_layers = self.features
+        self.hidden_size = 2*self.sequence_len# hardcoded
+
+        self.rnn = nn.GRU(
+            input_size = self.latent_vector_size,
+            hidden_size = self.hidden_size,
+            num_layers = self.num_layers,
+            bias = True,
+            batch_first = True,
+        )
+        self.relu = nn.ReLU()
+        self.fc = nn.Linear(self.hidden_size, self.sequence_len)
+        self.tanh = nn.Tanh()
+
+    def forward(self, z):
+        h0 = torch.zeros(self.num_layers, z.size(0), self.hidden_size).requires_grad_()
+        out, h = self.rnn(z, h0)
+        out = self.fc(self.relu(out))
+        out = self.tanh(out)
+        out = out.view(-1, self.sequence_len, self.features)
+
+        return out
+
 
 def generate_sine_features(
     params: SineGenerationParameters, seed: int = 42
@@ -219,7 +305,8 @@ def generate_sine_features(
 def train(
     G: nn.Module,
     D: nn.Module,
-    noise_generator: Callable[[TrainParameters], Tensor],
+    batch_reshaper: Callable[[Tensor], Tensor],
+    noise_generator: Callable[[int, TrainParameters, int], Tensor],
     samples_parameters: list[SineGenerationParameters],
     params: TrainParameters,
     features_len: int,
@@ -266,11 +353,14 @@ def train(
     ):
         for batch_idx, (data_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
-            # TODO PREPARE DATA FOR SPECIFIC NETS
-            data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
+            data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len)
+            # data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
 
-            # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len)
-            # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # TODO CHECK THIS
+            # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
+            # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
+
+            # data_batch = data_batch.view(current_batch_size, params.sequence_len, features_len) # RNN PREPARATION
+
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -289,7 +379,7 @@ def train(
 
             ## Train with all-fake batch
             # Generate batch of latent vectors
-            noise = noise_generator(current_batch_size, params)
+            noise = noise_generator(current_batch_size, params, features_len)
             fake_generated = G(noise)
             # print(f"{fake_generated.shape=}")
             d_out_fake = D(fake_generated.detach()).view(-1)
@@ -328,10 +418,10 @@ def train(
 
             iters += 1
 
-        if epoch % 2 == 0:
+        if epoch % 10 == 0:
             with torch.no_grad():
                 generated_sample_count = 7
-                noise = noise_generator(generated_sample_count, params)
+                noise = noise_generator(generated_sample_count, params, features_len)
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 fig, ax = plot_sample(generated_sine)
@@ -339,7 +429,7 @@ def train(
 
             with torch.no_grad():
                 generated_sample_count = 100
-                noise = noise_generator(generated_sample_count, params)
+                noise = noise_generator(generated_sample_count, params, features_len)
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 save_box_plot_per_ts(
@@ -365,7 +455,7 @@ def plot_sample(sample: Tensor) -> tuple[Axes, Figure]:
     return fig, ax
 
 
-def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[SineGenerationParameters], params: TrainParameters) -> tuple[Axes, Figure]:
+def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[SineGenerationParameters], params: TrainParameters, plot: Optional[tuple[Axes, Figure]] = None) -> tuple[Axes, Figure]:
     if len(samples) != len(samples_parameters):
         raise ValueError("The specified samples and sample parameters have to have the same length.")
 
@@ -394,17 +484,16 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
 
         return eq
     
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
+    fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
     legends: list[tuple[any, any]] = []
     x = [i for i in range(params.sequence_len)]
     # ax.set_title("Training data")
-    sequence_count = sum(sample.size(dim=1) for sample in samples)
-    alpha = max(1/sequence_count, 1/255)
+    alphas = [min(params.sequence_len/sample.size(dim=0), 1) for sample in samples]
     prop_cycle = plt.rcParams['axes.prop_cycle']
     cmap = prop_cycle.by_key()['color']
     marker_line_color = "pink" # cmap[7]
     marker_color = "lightgrey" # cmap[7]
-    for s_idx, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
+    for s_idx, (sample, sample_params, alpha) in enumerate(zip(samples, samples_parameters, alphas)):
         legends.append((Line2D([0], [0], color=cmap[s_idx], lw=6), create_sample_legend_string(s_idx, sample_params)))
         for sequence in sample:
             t_seq = torch.transpose(sequence, 0, 1)
@@ -418,14 +507,14 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
         # [sequence, n*times, features] -> [sequence, mean(features)]
         t_sample_means = torch.mean(t_samples, dim=1)
         for f_idx, y in enumerate(torch.transpose(t_sample_means, 0, 1)):
-            lin, = ax.plot(x, y, c=marker_line_color, lw=2, alpha=.5, linestyle='dashed', zorder=3, rasterized=True)
+            lin, = ax.plot(x, y, c=marker_line_color, lw=1.2, alpha=.5, linestyle='dashed', zorder=3)
             # mark, = ax.plot(x, y, marker='_', alpha=1, markersize=12)
             mark, = ax.plot(x, y, linestyle='none', marker='_', markerfacecolor=marker_color, markeredgecolor=marker_color, markersize=10, markeredgewidth=1, zorder=4)
             # only create a single legend entry
             if s_idx == 0 and f_idx == 0:
                 legends.append(((lin, mark), r'$E[X_{[t]_{s}}]$'))
 
-    ax.set_rasterization_zorder(2)
+    # ax.set_rasterization_zorder(0)
     x_labels = ["$" + str(i) + "$" for i in x]
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels)
@@ -433,8 +522,6 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
     ax.set_ylabel(            
         r"$X_{[t]_s} \sim \overrightarrow{a} * \sin(\frac{2\pi t}{s}) + \nu * \mathcal{N}(0,1)$", fontsize=12
     )
-
-    ax.grid(axis='x', color='0.95')
     ax.legend(map(lambda e: e[0], legends), map(lambda e: e[1], legends))
     
     return fig, ax
@@ -516,6 +603,7 @@ def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list
     train(
         G=G,
         D=D,
+        batch_reshaper=fnn_batch_reshaper,
         noise_generator=fnn_noise_generator,
         samples_parameters=samples_parameters,
         params=params,
@@ -531,13 +619,13 @@ def train_fnn_single_sample_univariate(params: TrainParameters, sample_batches: 
     """
     amplitudes = [1.0]
     features_len = len(amplitudes)
-    samples: list[Tensor] = [
-        generate_sine_features(
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0
         ),
     ]
 
-    setup_fnn_models_and_train(params, samples, features_len, save_images_path / "fnn_single_sample_univariate")
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate")
 
 
 def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_batches: int):
@@ -551,7 +639,7 @@ def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_bat
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.05
         ),
     ]
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "noisy_single_sample_univariate")
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate")
 
 
 def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
@@ -590,7 +678,7 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 
-def setup_cnn_models_and_train(params: TrainParameters, samples: list[Tensor], features_len: int, save_path: PurePath):
+def setup_cnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
     G = GeneratorCNN(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
@@ -604,8 +692,9 @@ def setup_cnn_models_and_train(params: TrainParameters, samples: list[Tensor], f
     train(
         G=G,
         D=D,
+        batch_reshaper=cnn_batch_reshaper,
         noise_generator=cnn_noise_generator,
-        samples=samples,
+        samples_parameters=samples_parameters,
         params=params,
         features_len=features_len,
         save_path=save_path,
@@ -615,33 +704,71 @@ def setup_cnn_models_and_train(params: TrainParameters, samples: list[Tensor], f
 
 def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: int):
     """
-    This should give us a baseline for the simplest training possible
+    XXXX
     """
     amplitudes = [1.0]
     features_len = len(amplitudes)
-    samples: list[Tensor] = [
-        generate_sine_features(
-            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
-        )
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01)
     ]
-    return setup_cnn_models_and_train(params, samples, features_len, save_images_path / "cnn_single_sample_univariate")
+    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_single_sample_univariate")
 
 
 def train_cnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     """
-    This should give us a baseline for the simplest training possible
+    XXXX
     """
     features_len = 1
-    samples: list[Tensor] = [
-        generate_sine_features(
-            sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01
-        ),
-        generate_sine_features(
-            sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
-        ),
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
+    ]
+    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_multiple_sample_univariate")
+
+def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
+    """
+    XXXX
+    """
+    features_len = 2
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1, 0.5], times=sample_batches, noise_scale=0.01),
+    ]
+    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_single_sample_multivariate")
+
+def setup_rnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
+    G = GeneratorRNN(
+        latent_vector_size=train_params.latent_vector_size,
+        features=features_len,
+        sequence_len=train_params.sequence_len
+    )
+
+    D = DiscriminatorRNN(
+        features=features_len,
+        out_features=1,
+        sequence_len=train_params.sequence_len
+    )
+
+    train(
+        G=G,
+        D=D,
+        batch_reshaper=rnn_batch_reshaper,
+        noise_generator=rnn_noise_generator,
+        samples_parameters=samples_parameters,
+        params=params,
+        features_len=features_len,
+        save_path=save_path,
+    )
+    return G
+
+
+def train_rnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
+    features_len = 1
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
+        # SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1, 0.5, 0.25], times=sample_batches, noise_scale=0.01)
     ]
 
-    return setup_cnn_models_and_train(params, samples, features_len, save_images_path / "cnn_multiple_sample_univariate")
+    return setup_rnn_models_and_train(params, samples_parameters, features_len, save_images_path / "rnn_multiple_sample_univariate")
 
 def save_multi_sample_multivariate_training_data_sample_overview(params: TrainParameters):
     times = 500
@@ -663,7 +790,7 @@ def save_multi_sample_multivariate_training_data_sample_overview(params: TrainPa
 if __name__ == "__main__":
     sns.set_theme()
     sns.set_context("paper")
-    sns.set_palette("colorblind")
+    # sns.set_palette("colorblind")
     set_latex_plot_params()
 
     manualSeed = 1337
@@ -672,13 +799,12 @@ if __name__ == "__main__":
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
 
-
-    train_params = TrainParameters(epochs=1)
-    sample_batches = train_params.batch_size * 1
+    train_params = TrainParameters(epochs=150)
+    sample_batches = train_params.batch_size * 200
 
     # save sample image for synthetic test data
     save_multi_sample_multivariate_training_data_sample_overview(train_params)
-
+    
     # FNN trainings
     # train_fnn_single_sample_univariate(train_params, sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
@@ -687,4 +813,8 @@ if __name__ == "__main__":
 
     # CNN trainings
     # train_cnn_single_sample_univariate(train_params, sample_batches)
+    train_cnn_single_sample_multivariate(train_params, sample_batches)
     # train_cnn_multiple_sample_univariate(train_params, sample_batches)
+
+    # RNN
+    # train_rnn_multiple_sample_univariate(train_params, sample_batches)
