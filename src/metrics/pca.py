@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-from plots.typing import PlotResult
+from src.plots.typing import PlotResult
 from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
 
 """

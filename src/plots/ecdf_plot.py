@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from statsmodels.distributions import StepFunction
 
-from plots.typing import PlotData, PlotColor, PlotResult, PlotOptions, PlotDataType
+from src.plots.typing import PlotData, PlotColor, PlotResult, PlotOptions, PlotDataType
 
 
 @dataclass

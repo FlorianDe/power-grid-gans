@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from net import CustomModule
+from src.net import CustomModule
 
 
 class CNNGenerator(CustomModule):

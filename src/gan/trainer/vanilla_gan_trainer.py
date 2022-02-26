@@ -8,13 +8,16 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
-from gan.trainer.base_trainer import BaseTrainer
+from tqdm import trange
+
 from src.data.data_holder import DataHolder
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.gan.trainer.base_trainer import BaseTrainer
 from src.gan.discriminator.basic_discriminator import BasicDiscriminator
 from src.gan.generator.basic_generator import BasicGenerator
 from src.gan.trainer.typing import TrainModel
 from src.utils.tensorboard_utils import TensorboardUtils, GraphPlotItem
+
 
 def stable_bce_loss(input, target):
     """
@@ -35,6 +38,7 @@ def stable_bce_loss(input, target):
     loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
     return loss.mean()
 
+
 class StableBCELoss(nn.modules.Module):
     def __init__(self):
         super(StableBCELoss, self).__init__()
@@ -43,6 +47,9 @@ class StableBCELoss(nn.modules.Module):
         neg_abs = - input.abs()
         loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
         return loss.mean()
+
+    def __call__(self, input, target):
+        return self.forward(input, target)
 
 
 class VanillaGANTrainer(BaseTrainer):
@@ -53,7 +60,7 @@ class VanillaGANTrainer(BaseTrainer):
             data_holder: DataHolder,
             noise_vector_size: int,
             sequence_length: int,
-            batch_size: int = 10,
+            batch_size: int,
             device: Union[torch.device, int, str] = 'cpu'
     ) -> None:
         super().__init__(
@@ -76,13 +83,13 @@ class VanillaGANTrainer(BaseTrainer):
         dataset = data_holder.get_tensor_dataset()
         self.train_data_loader = DataLoader(
             dataset,
-            batch_size=self.sequence_length,
+            batch_size=self.batch_size,
             shuffle=False,
             drop_last=True
         )
-        self.objective = stable_bce_loss # nn.BCELoss() # StableBCELoss()  # nn.BCEWithLogitsLoss()  # TODO REPLACE WITH CUSTOM LOSS FUNCTIONS!
-        self.real_labels = torch.ones(self.sequence_length, requires_grad=False, device=self.device)
-        self.fake_labels = torch.zeros(self.sequence_length, requires_grad=False, device=self.device)
+        self.objective = StableBCELoss()  # stable_bce_loss # nn.BCELoss() # StableBCELoss()  # nn.BCEWithLogitsLoss()  # TODO REPLACE WITH CUSTOM LOSS FUNCTIONS!
+        self.real_labels = torch.ones(self.batch_size, requires_grad=False, device=self.device)
+        self.fake_labels = torch.zeros(self.batch_size, requires_grad=False, device=self.device)
         self.gen_losses = []
         self.dis_losses = []
         self.iter_no = 0
@@ -112,7 +119,7 @@ class VanillaGANTrainer(BaseTrainer):
     def noise_vector(self):
         # Probably refactor to the generator class, since itself knows its input size!
         # features = self.data.shape[1]
-        return torch.rand(self.batch_size, self.data_holder.get_feature_size(), self.noise_vector_size)
+        return torch.rand(self.batch_size, self.noise_vector_size)
 
     def __reset_running_calculations(self):
         self.gen_losses = []
@@ -162,16 +169,17 @@ class VanillaGANTrainer(BaseTrainer):
     def train(self, max_epochs):
         self.__initialize_training()
 
-        for epoch in range(max_epochs):
+        for epoch in trange(max_epochs):
             for idx, (real_data, labels) in enumerate(self.train_data_loader):
-                # real_data = data[0].view(self.batch_size, -1)
-                real_data = real_data.view(1, self.data_holder.get_feature_size(), self.sequence_length)
+                real_data = real_data.view(self.batch_size, -1)
+                # real_data = real_data.view(1, self.data_holder.get_feature_size(), self.sequence_length)
                 generated_data = self.generator.model(self.noise_vector()).detach()
+                # generated_data = generated_data.view(self.batch_size, self.sequence_length, self.data_holder.get_feature_size())
                 self.train_discriminator(real_data, generated_data)
                 self.train_generator(generated_data)
                 self.iter_no += 1
-                self.__write_training_stats(real_data, generated_data)
-            # print("Epoch [{} / {}] => {: 6.2f}% done.".format(str(epoch).zfill(len(str(max_epochs))), max_epochs, (100 * epoch / max_epochs)), end="\r")
+                # self.__write_training_stats(real_data, generated_data)
+            print("Epoch [{} / {}] => {: 6.2f}% done.".format(str(epoch).zfill(len(str(max_epochs))), max_epochs, (100 * epoch / max_epochs)), end="\r")
 
 
 if __name__ == '__main__':

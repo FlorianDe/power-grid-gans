@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy.typing as npt
 from matplotlib.axes import Axes
 
-from plots.typing import PlotResult, PlotData, PlotOptions
+from src.plots.typing import PlotResult, PlotData, PlotOptions
 
 
 def draw_box_like_plot(

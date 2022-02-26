@@ -2,8 +2,8 @@ from typing import Optional
 
 import numpy.typing as npt
 
-from plots.box_plot import draw_box_like_plot
-from plots.typing import PlotResult, PlotData, PlotOptions
+from src.plots.box_plot import draw_box_like_plot
+from src.plots.typing import PlotResult, PlotData, PlotOptions
 
 
 def draw_violin_plot(

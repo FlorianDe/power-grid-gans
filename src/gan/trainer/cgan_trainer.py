@@ -8,9 +8,9 @@ from torch import Tensor
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
-from gan.discriminator.basic_discriminator import BasicDiscriminator
-from gan.generator.basic_generator import BasicGenerator
-from metrics.forecast_performance import mase
+from src.gan.discriminator.basic_discriminator import BasicDiscriminator
+from src.gan.generator.basic_generator import BasicGenerator
+from src.metrics.forecast_performance import mase
 from src.gan.trainer.base_trainer import BaseTrainer
 from src.data.data_holder import DataHolder
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter

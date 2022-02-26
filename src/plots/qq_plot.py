@@ -6,7 +6,7 @@ import numpy.typing as npt
 from matplotlib import pyplot as plt
 from scipy import stats
 
-from plots.typing import PlotData, PlotOptions, PlotResult, Point, Locale
+from src.plots.typing import PlotData, PlotOptions, PlotResult, Point, Locale
 
 
 class __Keys(Enum):
