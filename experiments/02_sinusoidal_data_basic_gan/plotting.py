@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import PurePath
 from typing import Optional
 
 from matplotlib import pyplot as plt
@@ -120,6 +121,38 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
 
     return fig, ax
 
+def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params: TrainParameters, save_path: PurePath):
+    sample_size = data.shape[0]
+    features_len = data.shape[2]
+
+    t_data = torch.transpose(data, 0, 1)  # [10, 24, 3]  -> [24, 10, 3]
+    # [10, 24, 3] -> list_3([24, 10)
+    t_data_single_feature = torch.unbind(t_data, 2)
+
+    # list_n([times, sequence, features]) -> [n*times, sequence, features]
+    conc_samples = torch.concat(samples, dim=0)
+    # [n*times, sequence, features] -> [sequence, n*times, features]
+    t_samples = torch.transpose(conc_samples, 0, 1)
+    # [sequence, n*times, features] -> [sequence, mean(features)]
+    t_sample_means = torch.mean(t_samples, dim=1)
+
+    for feature_idx in range(features_len):
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        x_labels = ["$" + str(i) + "$" for i in range(params.sequence_len)]
+        # labels = ["$t_{" + str(i) + "}$" for i in range(params.sequence_len)]
+        ax.plot(np.arange(params.sequence_len) + 1, torch.transpose(t_sample_means, 0, 1)[feature_idx], label=r'$E[X_{[t]_{s}}]$')
+        ax.boxplot(
+            t_data_single_feature[feature_idx], labels=x_labels, bootstrap=5000, showmeans=True, meanline=True, notch=True
+        )
+
+        ax.set_xlabel("$[t]_{s}$", fontsize=12)
+        ax.set_ylabel(
+            r"$G_{t, " + str(feature_idx) + r"}(Z), Z \sim \mathcal{N}(0,1), \vert Z \vert=" + str(sample_size) + r"$",
+            fontsize=12,
+        )
+        ax.legend()
+
+        save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
 def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainParameters) -> tuple[Figure, Axes]:
     fig, ax_iter = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
