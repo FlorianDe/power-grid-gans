@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from matplotlib import ticker
 from tqdm import tqdm
 import seaborn as sns
 
@@ -23,7 +24,7 @@ from torch import Tensor, dropout
 from torch.utils.data import DataLoader
 
 from experiments.utils import get_experiments_folder, set_latex_plot_params
-from src.plots.typing import Locale, PlotResult
+from src.plots.typing import Locale
 
 PLOT_LANG = Locale.DE
 save_images_path = (
@@ -34,14 +35,14 @@ save_images_path.mkdir(parents=True, exist_ok=True)
 
 class SimpleGanPlotResultColumns(Enum):
     LOSS = "loss"
-    EPOCHS = "epochs"
-    ITERATIONS = "iterations"
+    EPOCH = "epoch"
+    ITERATION = "iteration"
 
 
 __PLOT_DICT: dict[SimpleGanPlotResultColumns, dict[Locale, str]] = {
     SimpleGanPlotResultColumns.LOSS: {Locale.EN: "Loss", Locale.DE: "Verlust"},
-    SimpleGanPlotResultColumns.EPOCHS: {Locale.EN: "Epochs", Locale.DE: "Epochen"},
-    SimpleGanPlotResultColumns.ITERATIONS: {Locale.EN: "Iterations", Locale.DE: "Iteration"},
+    SimpleGanPlotResultColumns.EPOCH: {Locale.EN: "Epoch", Locale.DE: "Epoche"},
+    SimpleGanPlotResultColumns.ITERATION: {Locale.EN: "Iteration", Locale.DE: "Iteration"},
 }
 
 
@@ -75,18 +76,33 @@ def fnn_noise_generator(current_batch_size: int, params: TrainParameters, featur
 
 
 class DiscriminatorFNN(nn.Module):
-    def __init__(self, features: int, sequence_len: int, out_features: int = 1):
+    def __init__(self, features: int, sequence_len: int, out_features: int = 1, dropout: float = 0.5):
         super(DiscriminatorFNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
-        self.dense1 = nn.Linear(
-            in_features=sequence_len * features,
-            out_features=out_features,
+        input_size = sequence_len * features
+        negative_slope = 1e-2
+        self.fnn = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(input_size, 2*input_size),
+            nn.LeakyReLU(negative_slope, inplace=True),
+
+            nn.Dropout(p=dropout),
+            nn.Linear(2*input_size, 4*input_size),
+            nn.LeakyReLU(negative_slope, inplace=True),
+            # nn.Linear(4*input_size, 6*input_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            # nn.Linear(6*input_size, 4*input_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            # nn.Linear(4*input_size, 2*input_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            nn.Dropout(p=dropout),
+            nn.Linear(4*input_size, 1)
         )
-        self.activation1 = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.activation1(self.dense1(x))
+        return self.sigmoid(self.fnn(x))
 
 
 class GeneratorFNN(nn.Module):
@@ -95,19 +111,34 @@ class GeneratorFNN(nn.Module):
         latent_vector_size: int,
         features: int,
         sequence_len: int,
+        dropout: float = 0.5
     ):
         super(GeneratorFNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
-        self.dense1 = nn.Linear(
-            in_features=latent_vector_size,
-            out_features=features * sequence_len,
+        negative_slope = 1e-2
+        self.fnn = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(latent_vector_size, 2*latent_vector_size),
+            nn.LeakyReLU(negative_slope, inplace=True),
+            nn.Dropout(p=dropout),
+            nn.Linear(2*latent_vector_size, 4*latent_vector_size),
+            nn.LeakyReLU(negative_slope, inplace=True),
+
+            # nn.Linear(4*latent_vector_size, 6*latent_vector_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            # nn.Linear(6*latent_vector_size, 4*latent_vector_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            # nn.Linear(4*latent_vector_size, 2*latent_vector_size),
+            # nn.LeakyReLU(negative_slope, inplace=True),
+            nn.Dropout(p=dropout),
+            nn.Linear(4*latent_vector_size, features * sequence_len),
         )
-        self.activation1 = nn.Tanh()
+        self.tanh = nn.Tanh()
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.activation1(self.dense1(x))
-        # return self.dense1(x) # removed tanh
+        return self.tanh(self.fnn(x))
+        # return self.fnn(x) # removed tanh
 
 
 class PrintSize(nn.Module):
@@ -119,7 +150,6 @@ class PrintSize(nn.Module):
         return x
 
 def cnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
-    # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
     # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
     return data_batch.view(batch_size, features_len, sequence_len)
 
@@ -418,13 +448,14 @@ def train(
 
             iters += 1
 
-        if epoch % 10 == 0:
+        if epoch % 2 == 0:
             with torch.no_grad():
                 generated_sample_count = 7
                 noise = noise_generator(generated_sample_count, params, features_len)
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                fig, ax = plot_sample(generated_sine)
+                fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
+                fig, ax = plot_sample(generated_sine, (fig, ax))
                 save_fig(fig, save_path / f"{epoch}.png")
 
             with torch.no_grad():
@@ -446,8 +477,8 @@ def save_fig(fig, path):
     plt.close(fig)
 
 
-def plot_sample(sample: Tensor) -> tuple[Axes, Figure]:
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+def plot_sample(sample: Tensor, plot: tuple[Figure, Axes]) -> tuple[Figure, Axes]:
+    fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1)
     unbind_sample = torch.unbind(sample)
     flattened_sample = torch.concat(unbind_sample)
     for i, y in enumerate(torch.transpose(flattened_sample, 0, 1)):
@@ -455,7 +486,7 @@ def plot_sample(sample: Tensor) -> tuple[Axes, Figure]:
     return fig, ax
 
 
-def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[SineGenerationParameters], params: TrainParameters, plot: Optional[tuple[Axes, Figure]] = None) -> tuple[Axes, Figure]:
+def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[SineGenerationParameters], params: TrainParameters, plot: Optional[tuple[Figure, Axes]] = None) -> tuple[Figure, Axes]:
     if len(samples) != len(samples_parameters):
         raise ValueError("The specified samples and sample parameters have to have the same length.")
 
@@ -519,44 +550,43 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels)
     ax.set_xlabel("$[t]_{s}$", fontsize=12)
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(10))
+    # ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
     ax.set_ylabel(            
         r"$X_{[t]_s} \sim \overrightarrow{a} * \sin(\frac{2\pi t}{s}) + \nu * \mathcal{N}(0,1)$", fontsize=12
     )
     ax.legend(map(lambda e: e[0], legends), map(lambda e: e[1], legends))
-    
+
+
     return fig, ax
 
 
-def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainParameters) -> tuple[Axes, Figure]:
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
+def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainParameters) -> tuple[Figure, Axes]:
+    fig, ax_iter = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
 
-    ax.set_title("Generator and Discriminator Loss During Training")
-    ax.plot(g_losses, label=r"$L_{G}$")
-    ax.plot(d_losses, label=r"$L_{D}$")
-    ax.legend()
-    ax.set_xlabel(translate(SimpleGanPlotResultColumns.ITERATIONS))
-    ax.set_ylabel(translate(SimpleGanPlotResultColumns.LOSS))
-    # exp = lambda x: 10**(x)
-    # log = lambda x: np.log(x)
+    # ax_iter.set_title("Generator und Diskriminator Loss")
+    ax_iter.plot(g_losses, label=r"$L_{G}$")
+    ax_iter.plot(d_losses, label=r"$L_{D}$")
+    ax_iter.legend()
+    ax_iter.set_xlabel(translate(SimpleGanPlotResultColumns.ITERATION))
+    ax_iter.set_ylabel(translate(SimpleGanPlotResultColumns.LOSS))
 
-    # # Set x scale to exponential
-    # ax.set_xscale('function', functions=(exp, log))
-    # ax.set_xscale('log')
+    max_iterations = len(g_losses)
+    max_epochs = params.epochs
 
-    # ax2 = ax.twiny()
-    # ax2 = ax.secondary_xaxis('top')
-    # ax2.set_xlabel(translate(SimpleGanPlotResultColumns.EPOCHS))
+    def iter2epoch(iter):
+        return max_epochs*(iter/max_iterations)
 
-    # ax2.set_xlim(0, params.epochs)
+    def epoch2iter(epoch):
+        return max_iterations*(epoch/max_epochs)
 
-    # epoch_ticks =
-    # ax2.set_xticks([10, 30, 40])
-    # ax2.set_xticklabels(['7','8','99'])
-    # ax2.set_xscale('log')
-    # ax2.set_xticks([10, 30, 40])
-    # ax2.set_xticklabels(['7','8','99'])
+    ax_epochs = ax_iter.secondary_xaxis("top", functions=(iter2epoch, epoch2iter))
+    ax_epochs.set_xlabel(translate(SimpleGanPlotResultColumns.EPOCH))
+    # ax_epochs.xaxis.set_major_locator(ticker.Autolocator())
+    # ax_epochs.set_xlim(0, params.epochs)
+    # ax_epochs.set_xbound(ax_iter.get_xbound())
 
-    return fig, ax
+    return fig, ax_iter
 
 
 def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params: TrainParameters, save_path: PurePath):
@@ -576,30 +606,31 @@ def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params
 
     for feature_idx in range(features_len):
         fig, ax = plt.subplots(nrows=1, ncols=1)
-        labels = ["$t_{" + str(i) + "}$" for i in range(params.sequence_len)]
-        ax.plot(np.arange(params.sequence_len) + 1, torch.transpose(t_sample_means, 0, 1)[feature_idx])
+        x_labels = ["$" + str(i) + "$" for i in range(params.sequence_len)]
+        # labels = ["$t_{" + str(i) + "}$" for i in range(params.sequence_len)]
+        ax.plot(np.arange(params.sequence_len) + 1, torch.transpose(t_sample_means, 0, 1)[feature_idx], label=r'$E[X_{[t]_{s}}]$')
         ax.boxplot(
-            t_data_single_feature[feature_idx], labels=labels, bootstrap=5000, showmeans=True, meanline=True, notch=True
+            t_data_single_feature[feature_idx], labels=x_labels, bootstrap=5000, showmeans=True, meanline=True, notch=True
         )
 
-        ax.set_xlabel("t", fontsize=12)
+        ax.set_xlabel("$[t]_{s}$", fontsize=12)
         ax.set_ylabel(
             r"$G_{t, " + str(feature_idx) + r"}(Z), Z \sim \mathcal{N}(0,1), \vert Z \vert=" + str(sample_size) + r"$",
             fontsize=12,
         )
+        ax.legend()
 
         save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
 
-def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
-
+def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath, dropout: float = 0.5):
     G = GeneratorFNN(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
         sequence_len=params.sequence_len,
+        dropout=dropout
     )
-    D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1)
-
+    D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1, dropout=dropout)
     train(
         G=G,
         D=D,
@@ -613,7 +644,7 @@ def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list
     return D, G
 
 
-def train_fnn_single_sample_univariate(params: TrainParameters, sample_batches: int):
+def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters, sample_batches: int):
     """
     This should give us a baseline for the simplest training possible
     """
@@ -625,7 +656,7 @@ def train_fnn_single_sample_univariate(params: TrainParameters, sample_batches: 
         ),
     ]
 
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate")
+    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate_no_regularization", 0)
 
 
 def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_batches: int):
@@ -636,7 +667,7 @@ def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_bat
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
         SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.05
+            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         ),
     ]
     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate")
@@ -649,7 +680,7 @@ def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches
     amplitudes = [0.5, 1.0]
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0)
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01)
     ]
     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate")
 
@@ -660,11 +691,11 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
     """
     features_len = 1
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0),
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01),
         SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0
+            sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0.01
         ),
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0),
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
     ]
     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate")
 
@@ -799,21 +830,21 @@ if __name__ == "__main__":
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
 
-    train_params = TrainParameters(epochs=150)
-    sample_batches = train_params.batch_size * 200
+    train_params = TrainParameters(epochs=50)
+    sample_batches = train_params.batch_size * 100
 
     # save sample image for synthetic test data
     save_multi_sample_multivariate_training_data_sample_overview(train_params)
     
     # FNN trainings
-    # train_fnn_single_sample_univariate(train_params, sample_batches)
+    train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
     # train_fnn_single_sample_multivariate(train_params, sample_batches)
     # train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
     # CNN trainings
     # train_cnn_single_sample_univariate(train_params, sample_batches)
-    train_cnn_single_sample_multivariate(train_params, sample_batches)
+    # train_cnn_single_sample_multivariate(train_params, sample_batches)
     # train_cnn_multiple_sample_univariate(train_params, sample_batches)
 
     # RNN
