@@ -332,7 +332,9 @@ def save_box_vs_violinplot() -> PlotResult:
 
     scaler = LinearIntervalScaler(source=(figure_y_min, figure_y_max), destination=(0, 1))
 
-    def draw_desc(text: str, y_pos: float, x_poses: (float, float)):
+    # LINK HOW TO DRAW BETWEEN FIGURES
+    # https://matplotlib.org/stable/gallery/userdemo/connect_simple01.html#sphx-glr-gallery-userdemo-connect-simple01-py
+    def draw_desc(text: str, y_pos: float, x_poses: tuple[float, float]):
         y_cord = scaler(y_pos)
 
         print(text, y_pos, y_cord)

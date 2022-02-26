@@ -1,4 +1,5 @@
 import math
+import warnings
 
 import seaborn as sns
 
@@ -45,6 +46,7 @@ def chunks(lst, n):
 
 
 if __name__ == '__main__':
+    warnings.warn("Have been overhauled by 02_01_vanila_gan_sines.py", DeprecationWarning, stacklevel=2)
     sns.set_theme()
     sns.set_context("paper")
     sinusoidal_dists_root_folder = get_experiments_folder().joinpath("02_sinusoidal_data_basic")
