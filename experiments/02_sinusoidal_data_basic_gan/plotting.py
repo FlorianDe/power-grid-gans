@@ -95,14 +95,15 @@ def plot_train_data_overlayed(
         eq = r"$"
         eq += random_var_name
         eq += r"_{[t]_{"
-        eq += sequence_len
+        eq += r"s"  # sequence_len
         eq += r"}} \sim "
+        eq += r"\sin(\frac{2\pi t}{"
+        eq += r"s"  # sequence_len
+        eq += r"})"
+        eq += r" \cdot "
         eq += amplitude_vec
         if len(sample_params.amplitudes) > 1:
             eq += r"^{T}"
-        eq += r"*\sin(\frac{2\pi t}{"
-        eq += sequence_len
-        eq += r"})"
         if samples_parameters.noise_scale != 0:
             noise_scale = str(sample_params.noise_scale)
             eq += r" + "
@@ -161,7 +162,7 @@ def plot_train_data_overlayed(
     ax.set_xlabel("$[t]_{s}$", fontsize=12)
     ax.yaxis.set_major_locator(ticker.MaxNLocator(10))
     # ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
-    ax.set_ylabel(r"$X_{[t]_s} \sim \overrightarrow{a} * \sin(\frac{2\pi t}{s}) + \nu * \mathcal{N}(0,1)$", fontsize=12)
+    ax.set_ylabel(r"$X_{[t]_s} \sim \sin(\frac{2\pi t}{s})A + \epsilon_{t}$", fontsize=12)
     ax.legend(map(lambda e: e[0], legends), map(lambda e: e[1], legends))
 
     return fig, ax

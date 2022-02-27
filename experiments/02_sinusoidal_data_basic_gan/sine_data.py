@@ -15,7 +15,7 @@ class SineGenerationParameters:
         return iter((self.sequence_len, self.amplitudes, self.times, self.noise_scale))
 
 
-def generate_sine_features(params: SineGenerationParameters, seed: int = 42) -> tuple[Tensor, Tensor]:
+def generate_sine_features(params: SineGenerationParameters, seed: int = 42) -> Tensor:
     """
     Returns a multi dimensional sine wave feature of shape [times, sequence_len, features]
     """
@@ -32,3 +32,10 @@ def generate_sine_features(params: SineGenerationParameters, seed: int = 42) -> 
     noises = noise_scale * torch.randn(scaled_sines.shape)  # scaled Normal dist noise
 
     return scaled_sines + noises
+
+
+if __name__ == "__main__":
+    s = generate_sine_features(
+        SineGenerationParameters(sequence_len=24, times=5, amplitudes=[1, 0.5], noise_scale=0.01)
+    )
+    print(f"{s.size()}")
