@@ -1,6 +1,7 @@
 from enum import Enum
-from pathlib import PurePath
 from typing import Optional
+
+import numpy as np
 
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
@@ -121,7 +122,7 @@ def plot_train_data_overlayed(samples: list[Tensor], samples_parameters: list[Si
 
     return fig, ax
 
-def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params: TrainParameters, save_path: PurePath):
+def plot_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params: TrainParameters) -> tuple[Figure, Axes]:
     sample_size = data.shape[0]
     features_len = data.shape[2]
 
@@ -151,8 +152,8 @@ def save_box_plot_per_ts(data: Tensor, epoch: int, samples: list[Tensor], params
             fontsize=12,
         )
         ax.legend()
-
-        save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
+        yield (fig, ax)
+        # save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
 def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainParameters) -> tuple[Figure, Axes]:
     fig, ax_iter = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))

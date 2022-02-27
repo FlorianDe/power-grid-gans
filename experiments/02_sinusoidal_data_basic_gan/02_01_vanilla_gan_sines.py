@@ -5,7 +5,6 @@ import seaborn as sns
 
 import random
 from matplotlib import pyplot as plt
-import numpy as np
 
 import torch
 import torch.nn as nn
@@ -15,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from experiments.utils import get_experiments_folder, set_latex_plot_params
 
-from plotting import plot_model_losses, plot_train_data_overlayed, save_box_plot_per_ts, plot_sample, save_fig
+from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
 from sine_data import SineGenerationParameters, generate_sine_features
 from train_typing import TrainParameters
 
@@ -388,6 +387,7 @@ def train(
             with torch.no_grad():
                 generated_sample_count = 7
                 noise = noise_generator(generated_sample_count, params, features_len)
+                
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
@@ -399,9 +399,8 @@ def train(
                 noise = noise_generator(generated_sample_count, params, features_len)
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                save_box_plot_per_ts(
-                    data=generated_sine, epoch=epoch, samples=samples, params=params, save_path=save_path
-                )
+                for feature_idx, (fig, ax) in enumerate(plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=samples, params=params)):
+                    save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
     fig, ax = plot_model_losses(G_losses, D_losses, params)
     save_fig(fig, save_path / f"model_losses_after_{params.epochs}.png")
