@@ -25,7 +25,8 @@ save_images_path.mkdir(parents=True, exist_ok=True)
 
 
 def fnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
-    return data_batch.view(batch_size, sequence_len*features_len)
+    return data_batch.view(batch_size, sequence_len * features_len)
+
 
 def fnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
     return torch.randn(current_batch_size, params.latent_vector_size, device=params.device)
@@ -40,11 +41,10 @@ class DiscriminatorFNN(nn.Module):
         negative_slope = 1e-2
         self.fnn = nn.Sequential(
             nn.Dropout(p=dropout),
-            nn.Linear(input_size, 2*input_size),
+            nn.Linear(input_size, 2 * input_size),
             nn.LeakyReLU(negative_slope, inplace=True),
-
             nn.Dropout(p=dropout),
-            nn.Linear(2*input_size, 4*input_size),
+            nn.Linear(2 * input_size, 4 * input_size),
             nn.LeakyReLU(negative_slope, inplace=True),
             # nn.Linear(4*input_size, 6*input_size),
             # nn.LeakyReLU(negative_slope, inplace=True),
@@ -53,7 +53,7 @@ class DiscriminatorFNN(nn.Module):
             # nn.Linear(4*input_size, 2*input_size),
             # nn.LeakyReLU(negative_slope, inplace=True),
             nn.Dropout(p=dropout),
-            nn.Linear(4*input_size, 1)
+            nn.Linear(4 * input_size, 1),
         )
         self.sigmoid = nn.Sigmoid()
 
@@ -62,25 +62,18 @@ class DiscriminatorFNN(nn.Module):
 
 
 class GeneratorFNN(nn.Module):
-    def __init__(
-        self,
-        latent_vector_size: int,
-        features: int,
-        sequence_len: int,
-        dropout: float = 0.5
-    ):
+    def __init__(self, latent_vector_size: int, features: int, sequence_len: int, dropout: float = 0.5):
         super(GeneratorFNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
         negative_slope = 1e-2
         self.fnn = nn.Sequential(
             nn.Dropout(p=dropout),
-            nn.Linear(latent_vector_size, 2*latent_vector_size),
+            nn.Linear(latent_vector_size, 2 * latent_vector_size),
             nn.LeakyReLU(negative_slope, inplace=True),
             nn.Dropout(p=dropout),
-            nn.Linear(2*latent_vector_size, 4*latent_vector_size),
+            nn.Linear(2 * latent_vector_size, 4 * latent_vector_size),
             nn.LeakyReLU(negative_slope, inplace=True),
-
             # nn.Linear(4*latent_vector_size, 6*latent_vector_size),
             # nn.LeakyReLU(negative_slope, inplace=True),
             # nn.Linear(6*latent_vector_size, 4*latent_vector_size),
@@ -88,7 +81,7 @@ class GeneratorFNN(nn.Module):
             # nn.Linear(4*latent_vector_size, 2*latent_vector_size),
             # nn.LeakyReLU(negative_slope, inplace=True),
             nn.Dropout(p=dropout),
-            nn.Linear(4*latent_vector_size, features * sequence_len),
+            nn.Linear(4 * latent_vector_size, features * sequence_len),
         )
         self.tanh = nn.Tanh()
 
@@ -105,9 +98,11 @@ class PrintSize(nn.Module):
         print(x.shape)
         return x
 
+
 def cnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
     # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
     return data_batch.view(batch_size, features_len, sequence_len)
+
 
 def cnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
     return torch.randn(current_batch_size, params.latent_vector_size, 1, device=params.device)
@@ -187,32 +182,30 @@ class GeneratorCNN(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self.main(x)
 
+
 def rnn_batch_reshaper(data_batch: Tensor, batch_size: int, sequence_len: int, features_len: int) -> Tensor:
     return data_batch.view(batch_size, sequence_len, features_len)
+
 
 def rnn_noise_generator(current_batch_size: int, params: TrainParameters, features_len: int) -> Tensor:
     return torch.randn(current_batch_size, features_len, params.latent_vector_size, device=params.device)
 
+
 class DiscriminatorRNN(nn.Module):
-    def __init__(
-        self,
-        features: int, 
-        sequence_len: int, 
-        out_features: int = 1
-    ):
+    def __init__(self, features: int, sequence_len: int, out_features: int = 1):
         super(DiscriminatorRNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
         self.out_features = out_features
-        self.hidden_size = 2*out_features # hardcoded
+        self.hidden_size = 2 * out_features  # hardcoded
         self.num_layers = 1
-        self.rnn = nn.GRU( 
-            input_size = self.features,
-            hidden_size = self.hidden_size,
-            num_layers = self.num_layers,
-            bias = True,
-            batch_first = True,
-            dropout=0.5
+        self.rnn = nn.GRU(
+            input_size=self.features,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            bias=True,
+            batch_first=True,
+            dropout=0.5,
         )
         self.relu = nn.ReLU()
         self.fc = nn.Linear(self.hidden_size, self.out_features)
@@ -232,6 +225,7 @@ class DiscriminatorRNN(nn.Module):
     #     hidden = weight.new(self.num_layers, batch_size, self.hidden_size).zero_()  #.to(device)
     #     return hidden
 
+
 class GeneratorRNN(nn.Module):
     def __init__(
         self,
@@ -244,14 +238,14 @@ class GeneratorRNN(nn.Module):
         self.features = features
         self.sequence_len = sequence_len
         self.num_layers = self.features
-        self.hidden_size = 2*self.sequence_len# hardcoded
+        self.hidden_size = 2 * self.sequence_len  # hardcoded
 
         self.rnn = nn.GRU(
-            input_size = self.latent_vector_size,
-            hidden_size = self.hidden_size,
-            num_layers = self.num_layers,
-            bias = True,
-            batch_first = True,
+            input_size=self.latent_vector_size,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            bias=True,
+            batch_first=True,
         )
         self.relu = nn.ReLU()
         self.fc = nn.Linear(self.hidden_size, self.sequence_len)
@@ -299,7 +293,7 @@ def train(
     print(f"Preparing training data for: {save_path.name}")
     print(f"Start training with samples:")
     for i, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
-        print(f"{i}. sample s{sample.shape} with params: {sample_params}")
+        print(f"{i}. sample {sample.shape} with params: {sample_params}")
     flattened_samples = torch.concat(samples, dim=0)  # TODO FOR NOW JUST CONCAT THEM!
     print(f"{flattened_samples.shape=}")
     dataloader = DataLoader(
@@ -325,7 +319,6 @@ def train(
             # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
 
             # data_batch = data_batch.view(current_batch_size, params.sequence_len, features_len) # RNN PREPARATION
-
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -387,7 +380,7 @@ def train(
             with torch.no_grad():
                 generated_sample_count = 7
                 noise = noise_generator(generated_sample_count, params, features_len)
-                
+
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
@@ -399,7 +392,9 @@ def train(
                 noise = noise_generator(generated_sample_count, params, features_len)
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                for feature_idx, (fig, ax) in enumerate(plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=samples, params=params)):
+                for feature_idx, (fig, ax) in enumerate(
+                    plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=samples, params=params)
+                ):
                     save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
     fig, ax = plot_model_losses(G_losses, D_losses, params)
@@ -408,12 +403,18 @@ def train(
     print("End training\n--------------------------------------------")
 
 
-def setup_fnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath, dropout: float = 0.5):
+def setup_fnn_models_and_train(
+    params: TrainParameters,
+    samples_parameters: list[SineGenerationParameters],
+    features_len: int,
+    save_path: PurePath,
+    dropout: float = 0.5,
+):
     G = GeneratorFNN(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
         sequence_len=params.sequence_len,
-        dropout=dropout
+        dropout=dropout,
     )
     D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1, dropout=dropout)
     train(
@@ -441,7 +442,9 @@ def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters
         ),
     ]
 
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate_no_regularization", 0)
+    setup_fnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate_no_regularization", 0
+    )
 
 
 def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_batches: int):
@@ -455,7 +458,9 @@ def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_bat
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         ),
     ]
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate")
+    setup_fnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate"
+    )
 
 
 def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
@@ -465,9 +470,13 @@ def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches
     amplitudes = [0.5, 1.0]
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01)
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
+        )
     ]
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate")
+    setup_fnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate"
+    )
 
 
 def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
@@ -476,13 +485,19 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
     """
     features_len = 1
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01
+        ),
         SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0.01
         ),
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
+        ),
     ]
-    setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate")
+    setup_fnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate"
+    )
 
 
 def weights_init(m):
@@ -494,7 +509,9 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 
-def setup_cnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
+def setup_cnn_models_and_train(
+    params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath
+):
     G = GeneratorCNN(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
@@ -525,9 +542,13 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
     amplitudes = [1.0]
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01)
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
+        )
     ]
-    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_single_sample_univariate")
+    return setup_cnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "cnn_single_sample_univariate"
+    )
 
 
 def train_cnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
@@ -536,10 +557,17 @@ def train_cnn_multiple_sample_univariate(params: TrainParameters, sample_batches
     """
     features_len = 1
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01),
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01
+        ),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
+        ),
     ]
-    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_multiple_sample_univariate")
+    return setup_cnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "cnn_multiple_sample_univariate"
+    )
+
 
 def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
     """
@@ -547,22 +575,25 @@ def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches
     """
     features_len = 2
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1, 0.5], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[1, 0.5], times=sample_batches, noise_scale=0.01
+        ),
     ]
-    return setup_cnn_models_and_train(params, samples_parameters, features_len, save_images_path / "cnn_single_sample_multivariate")
+    return setup_cnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "cnn_single_sample_multivariate"
+    )
 
-def setup_rnn_models_and_train(params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath):
+
+def setup_rnn_models_and_train(
+    params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath
+):
     G = GeneratorRNN(
         latent_vector_size=train_params.latent_vector_size,
         features=features_len,
-        sequence_len=train_params.sequence_len
+        sequence_len=train_params.sequence_len,
     )
 
-    D = DiscriminatorRNN(
-        features=features_len,
-        out_features=1,
-        sequence_len=train_params.sequence_len
-    )
+    D = DiscriminatorRNN(features=features_len, out_features=1, sequence_len=train_params.sequence_len)
 
     train(
         G=G,
@@ -580,18 +611,23 @@ def setup_rnn_models_and_train(params: TrainParameters, samples_parameters: list
 def train_rnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     features_len = 1
     samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
+        ),
         # SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1, 0.5, 0.25], times=sample_batches, noise_scale=0.01)
     ]
 
-    return setup_rnn_models_and_train(params, samples_parameters, features_len, save_images_path / "rnn_multiple_sample_univariate")
+    return setup_rnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "rnn_multiple_sample_univariate"
+    )
+
 
 def save_multi_sample_multivariate_training_data_sample_overview(params: TrainParameters):
     times = 500
     save_path = save_images_path
     samples_parameters: list[SineGenerationParameters] = [
         SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[1], times=times, noise_scale=0.05),
-        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[2, 0.5], times=times, noise_scale=0.01)
+        SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[2, 0.5], times=times, noise_scale=0.01),
     ]
     # generate sample data
     samples = [generate_sine_features(params) for params in samples_parameters]
@@ -601,7 +637,7 @@ def save_multi_sample_multivariate_training_data_sample_overview(params: TrainPa
 
     fig, ax = plot_train_data_overlayed(samples, samples_parameters, params)
     save_fig(fig, save_path / "train_data_plot.pdf")
-    
+
 
 if __name__ == "__main__":
     sns.set_theme()
@@ -620,7 +656,7 @@ if __name__ == "__main__":
 
     # save sample image for synthetic test data
     save_multi_sample_multivariate_training_data_sample_overview(train_params)
-    
+
     # FNN trainings
     train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
