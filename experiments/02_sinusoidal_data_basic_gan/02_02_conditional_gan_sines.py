@@ -243,7 +243,7 @@ def train(
                     generated_sine = G(batch_noise, batch_conditions)
                     generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
-                    fig, ax = plot_sample(generated_sine, (fig, ax))
+                    fig, ax = plot_sample(sample=generated_sine, params=params, plot=(fig, ax), condition=cond_idx)
                     save_fig(fig, save_path / f"{epoch}_cond_{cond_idx}.png")
 
                 with torch.no_grad():
@@ -252,9 +252,10 @@ def train(
                     batch_conditions = torch.squeeze(torch.full((generated_sample_count, 1), cond_idx))
                     generated_sine = G(batch_noise, batch_conditions)
                     generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                    plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=[sample], params=params)
                     for feature_idx, (fig, ax) in enumerate(
-                        plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=[sample], params=params)
+                        plot_box_plot_per_ts(
+                            data=generated_sine, epoch=epoch, samples=[sample], params=params, condition=cond_idx
+                        )
                     ):
                         save_fig(
                             fig, save_path / f"distribution_epoch_{epoch}_cond_{cond_idx}_feature_{feature_idx}.png"
@@ -297,9 +298,7 @@ def init_weights(net, init_type="normal", init_gain=0.02):
                 raise NotImplementedError("initialization method [%s] is not implemented" % init_type)
             if hasattr(m, "bias") and m.bias is not None:
                 nn.init.constant_(m.bias.data, 0.01)
-        elif (
-            classname.find("BatchNorm1d") != -1
-        ):  # BatchNorm Layer's weight is not a matrix; only normal distribution applies.
+        elif classname.find("BatchNorm1d") != -1:
             nn.init.normal_(m.weight.data, 1.0, init_gain)
             nn.init.constant_(m.bias.data, 0.0)
 
@@ -332,7 +331,6 @@ def setup_fnn_models_and_train(
         out_features=1,
         dropout=dropout,
     )
-    # D.apply(init_weights)
     init_weights(D, "xavier", init_gain=nn.init.calculate_gain("relu"))
     train(
         G=G,
@@ -347,47 +345,6 @@ def setup_fnn_models_and_train(
     return D, G
 
 
-# def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters, sample_batches: int):
-#     """
-#     This should give us a baseline for the simplest training possible
-#     """
-#     amplitudes = [1.0]
-#     features_len = len(amplitudes)
-#     samples_parameters: list[SineGenerationParameters] = [
-#         SineGenerationParameters(
-#             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0
-#         ),
-#     ]
-
-#     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate_no_regularization", 0)
-
-
-# def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_batches: int):
-#     """
-#     Check how it affects the training if we add some noise on top of the training data
-#     """
-#     amplitudes = [1.0]
-#     features_len = len(amplitudes)
-#     samples_parameters: list[SineGenerationParameters] = [
-#         SineGenerationParameters(
-#             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
-#         ),
-#     ]
-#     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate")
-
-
-# def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
-#     """
-#     This should show us that the convergence is not as fast for multiple features!
-#     """
-#     amplitudes = [0.5, 1.0]
-#     features_len = len(amplitudes)
-#     samples_parameters: list[SineGenerationParameters] = [
-#         SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01)
-#     ]
-#     setup_fnn_models_and_train(params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate")
-
-
 def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     """
     This should result in a mode collapse
@@ -397,15 +354,30 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
         SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[0.95], times=sample_batches, noise_scale=0.01
         ),
-        # SineGenerationParameters(
-        #     sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
-        # ),
         SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[0.25], times=sample_batches, noise_scale=0.01
         ),
     ]
     setup_fnn_models_and_train(
         params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate"
+    )
+
+
+def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batches: int):
+    """
+    This should result in a mode collapse
+    """
+    features_len = 2
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[0.95, 0.5], times=sample_batches, noise_scale=0.01
+        ),
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[0.5, 0.2], times=sample_batches, noise_scale=0.01
+        ),
+    ]
+    setup_fnn_models_and_train(
+        params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_multivariate"
     )
 
 
@@ -425,7 +397,5 @@ if __name__ == "__main__":
     sample_batches = train_params.batch_size * 100
 
     # FNN trainings
-    # train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
-    # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
-    # train_fnn_single_sample_multivariate(train_params, sample_batches)
-    train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    train_fnn_multiple_sample_multivariate(train_params, sample_batches)

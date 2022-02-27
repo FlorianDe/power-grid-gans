@@ -384,7 +384,7 @@ def train(
                 generated_sine = G(noise)
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
-                fig, ax = plot_sample(generated_sine, (fig, ax))
+                fig, ax = plot_sample(sample=generated_sine, params=params, plot=(fig, ax))
                 save_fig(fig, save_path / f"{epoch}.png")
 
             with torch.no_grad():
