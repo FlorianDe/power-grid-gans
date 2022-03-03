@@ -13,6 +13,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 
 from experiments.utils import get_experiments_folder, set_latex_plot_params
+from src.net.net_summary import LatexTableOptions, create_summary
 
 from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
 from sine_data import SineGenerationParameters, generate_sine_features
@@ -417,6 +418,7 @@ def setup_fnn_models_and_train(
         dropout=dropout,
     )
     D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1, dropout=dropout)
+
     train(
         G=G,
         D=D,
@@ -655,13 +657,36 @@ if __name__ == "__main__":
     sample_batches = train_params.batch_size * 100
 
     # save sample image for synthetic test data
-    save_multi_sample_multivariate_training_data_sample_overview(train_params)
+    # save_multi_sample_multivariate_training_data_sample_overview(train_params)
 
     # FNN trainings
-    train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
+    # Print Fnn Nets
+    plot_features = 2
+    plot_dropout = 0.5
+    G = GeneratorFNN(
+        latent_vector_size=train_params.latent_vector_size,
+        features=plot_features,
+        sequence_len=train_params.sequence_len,
+        dropout=plot_dropout,
+    )
+    print(
+        create_summary(G, (train_params.latent_vector_size,)).to_latex_table(
+            options=LatexTableOptions("fnn_generator_sines_net_structure")
+        )
+    )
+    D = DiscriminatorFNN(
+        features=plot_features, sequence_len=train_params.sequence_len, out_features=1, dropout=plot_dropout
+    )
+    print(
+        create_summary(D, (train_params.sequence_len * plot_features,)).to_latex_table(
+            options=LatexTableOptions("fnn_diskriminator_sines_net_structure")
+        )
+    )
+
+    # train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
     # train_fnn_single_sample_multivariate(train_params, sample_batches)
-    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
     # CNN trainings
     # train_cnn_single_sample_univariate(train_params, sample_batches)
