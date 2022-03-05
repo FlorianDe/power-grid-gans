@@ -59,7 +59,13 @@ Pip command can be generated here: https://pytorch.org/get-started/locally/
 
 Sample:
 ```bash
-pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch==1.10.2+cu113 torchvision==0.11.3+cu113 torchaudio===0.10.2+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+```
+Maybe you also need to uninstall pytorch first and purge the cache manually:
+
+```
+pip uninstall torch
+pip cache purge
 ```
 
 #### 2. Atari [FileNotFoundError: Could not find module ale_c.dll](https://github.com/openai/gym/issues/1726#issuecomment-550580367)
