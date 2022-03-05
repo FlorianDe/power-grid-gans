@@ -12,12 +12,11 @@ import torch.optim as optim
 from torch import Tensor
 from torch.utils.data import DataLoader
 
+# from src.net.net_summary import LatexTableOptions, create_summary
 from experiments.utils import get_experiments_folder, set_latex_plot_params
-from src.net.net_summary import LatexTableOptions, create_summary
-
 from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
-from sine_data import SineGenerationParameters, generate_sine_features
 from train_typing import TrainParameters
+from sine_data import SineGenerationParameters, generate_sine_features
 
 save_images_path = (
     get_experiments_folder().joinpath("02_sinusoidal_data_basic_gan").joinpath("02_01_vanilla_gan_fnn_sines")
@@ -213,7 +212,7 @@ class DiscriminatorRNN(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_()
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_()  # TODO ADD DEVICE!
         out, h = self.rnn(x, h0)
         out = out[:, -1, :]
         # out_last = out[:,-1]
@@ -283,13 +282,13 @@ def train(
     optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
 
     # generate sample data
-    samples = [generate_sine_features(params) for params in samples_parameters]
+    samples = [generate_sine_features(params=params, device=train_params.device) for params in samples_parameters]
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
 
-    fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
-    save_fig(fig, save_path / "train_data_plot")
+    # fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
+    # save_fig(fig, save_path / "train_data_plot")
 
     print(f"Preparing training data for: {save_path.name}")
     print(f"Start training with samples:")
@@ -302,6 +301,7 @@ def train(
         batch_size=params.batch_size,
         shuffle=False,
         # num_workers=workers
+        # pin_memory=True,
     )
 
     G_losses = []
@@ -313,7 +313,7 @@ def train(
     ):
         for batch_idx, (data_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
-            data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len)
+            data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len).to(device)
             # data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
 
             # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
@@ -331,7 +331,6 @@ def train(
             D.zero_grad()
             # label = torch.full((current_batch_size), real_label_value, dtype=torch.float, device=params.device)
             d_out_real = D(data_batch).view(-1)
-            # print(f"{d_out_real.shape=}")
             d_err_real = criterion(d_out_real, real_labels)
             d_err_real.backward()
             D_x = d_err_real.mean().item()
@@ -416,8 +415,10 @@ def setup_fnn_models_and_train(
         features=features_len,
         sequence_len=params.sequence_len,
         dropout=dropout,
+    ).to(params.device)
+    D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1, dropout=dropout).to(
+        params.device
     )
-    D = DiscriminatorFNN(features=features_len, sequence_len=params.sequence_len, out_features=1, dropout=dropout)
 
     train(
         G=G,
@@ -518,10 +519,10 @@ def setup_cnn_models_and_train(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
         sequence_len=params.sequence_len,
-    )
+    ).to(params.device)
     G.apply(weights_init)
 
-    D = DiscriminatorCNN(features=features_len, sequence_len=params.sequence_len, out_features=1)
+    D = DiscriminatorCNN(features=features_len, sequence_len=params.sequence_len, out_features=1).to(params.device)
     D.apply(weights_init)
 
     train(
@@ -593,9 +594,11 @@ def setup_rnn_models_and_train(
         latent_vector_size=train_params.latent_vector_size,
         features=features_len,
         sequence_len=train_params.sequence_len,
-    )
+    ).to(params.device)
 
-    D = DiscriminatorRNN(features=features_len, out_features=1, sequence_len=train_params.sequence_len)
+    D = DiscriminatorRNN(features=features_len, out_features=1, sequence_len=train_params.sequence_len).to(
+        params.device
+    )
 
     train(
         G=G,
@@ -632,7 +635,7 @@ def save_multi_sample_multivariate_training_data_sample_overview(params: TrainPa
         SineGenerationParameters(sequence_len=params.sequence_len, amplitudes=[2, 0.5], times=times, noise_scale=0.01),
     ]
     # generate sample data
-    samples = [generate_sine_features(params) for params in samples_parameters]
+    samples = [generate_sine_features(params=sine_params, device=params.device) for sine_params in samples_parameters]
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
@@ -647,14 +650,16 @@ if __name__ == "__main__":
     # sns.set_palette("colorblind")
     set_latex_plot_params()
 
+    device: torch.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     manualSeed = 1337
+    print("Using device: ", device)
     print("Random Seed: ", manualSeed)
     random.seed(manualSeed)
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
 
-    train_params = TrainParameters(epochs=50)
-    sample_batches = train_params.batch_size * 100
+    train_params = TrainParameters(batch_size=16, epochs=50, device=device)
+    sample_batches = train_params.batch_size * 128
 
     # save sample image for synthetic test data
     # save_multi_sample_multivariate_training_data_sample_overview(train_params)
@@ -669,24 +674,24 @@ if __name__ == "__main__":
         sequence_len=train_params.sequence_len,
         dropout=plot_dropout,
     )
-    print(
-        create_summary(G, (train_params.latent_vector_size,)).to_latex_table(
-            options=LatexTableOptions("fnn_generator_sines_net_structure")
-        )
-    )
+    # print(
+    #    create_summary(G, (train_params.latent_vector_size,)).to_latex_table(
+    #        options=LatexTableOptions("fnn_generator_sines_net_structure")
+    #    )
+    # )
     D = DiscriminatorFNN(
         features=plot_features, sequence_len=train_params.sequence_len, out_features=1, dropout=plot_dropout
     )
-    print(
-        create_summary(D, (train_params.sequence_len * plot_features,)).to_latex_table(
-            options=LatexTableOptions("fnn_diskriminator_sines_net_structure")
-        )
-    )
+    # print(
+    #    create_summary(D, (train_params.sequence_len * plot_features,)).to_latex_table(
+    #        options=LatexTableOptions("fnn_diskriminator_sines_net_structure")
+    #    )
+    # )
 
-    # train_fnn_single_sample_univariate_no_regularization(TrainParameters(epochs=200), sample_batches)
-    # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
+    train_fnn_single_sample_univariate_no_regularization(train_params, sample_batches)
+    train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
     # train_fnn_single_sample_multivariate(train_params, sample_batches)
-    train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
     # CNN trainings
     # train_cnn_single_sample_univariate(train_params, sample_batches)

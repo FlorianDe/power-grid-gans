@@ -45,6 +45,7 @@ def save_fig(fig, path):
 def plot_sample(
     sample: Tensor, params: TrainParameters, plot: tuple[Figure, Axes], condition: Optional[int] = None
 ) -> tuple[Figure, Axes]:
+    sample = sample.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
     fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1)
     unbind_sample = torch.unbind(sample)
     flattened_sample = torch.concat(unbind_sample)
@@ -86,6 +87,7 @@ def plot_train_data_overlayed(
 ) -> tuple[Figure, Axes]:
     if len(samples) != len(samples_parameters):
         raise ValueError("The specified samples and sample parameters have to have the same length.")
+    samples = [sample.cpu() for sample in samples]
 
     def create_sample_legend_string(idx: int, samples_parameters: SineGenerationParameters) -> str:
         amplitude_vec = str(sample_params.amplitudes)
@@ -171,6 +173,8 @@ def plot_train_data_overlayed(
 def plot_box_plot_per_ts(
     data: Tensor, epoch: int, samples: list[Tensor], params: TrainParameters, condition: Optional[int] = None
 ) -> tuple[Figure, Axes]:
+    data = data.cpu()
+    samples = [sample.cpu() for sample in samples]
     sample_size = data.shape[0]
     features_len = data.shape[2]
 
