@@ -1,5 +1,6 @@
+from string import Template
 from pathlib import PurePath
-from typing import Callable
+from typing import Callable, Optional
 from tqdm import tqdm
 import seaborn as sns
 
@@ -14,7 +15,14 @@ from torch.utils.data import DataLoader
 
 # from src.net.net_summary import LatexTableOptions, create_summary
 from experiments.utils import get_experiments_folder, set_latex_plot_params
-from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
+from plotting import (
+    plot_model_losses,
+    plot_train_data_overlayed,
+    plot_box_plot_per_ts,
+    plot_sample,
+    save_fig,
+)
+from src.net.net_summary import LatexTableOptions, create_summary
 from train_typing import TrainParameters
 from sine_data import SineGenerationParameters, generate_sine_features
 
@@ -32,28 +40,28 @@ def fnn_noise_generator(current_batch_size: int, params: TrainParameters, featur
     return torch.randn(current_batch_size, params.latent_vector_size, device=params.device)
 
 
+def dense_block(input: int, output: int, dropout: float, activation_slope: Optional[float]):
+    layers: list[nn.Module] = []
+    if dropout != 0:
+        layers.append(nn.Dropout(p=dropout))
+    layers.append(nn.Linear(input, output))
+    if activation_slope:
+        layers.append(nn.LeakyReLU(activation_slope, inplace=True))
+    return layers
+
+
 class DiscriminatorFNN(nn.Module):
-    def __init__(self, features: int, sequence_len: int, out_features: int = 1, dropout: float = 0.5):
+    def __init__(
+        self, features: int, sequence_len: int, out_features: int = 1, dropout: float = 0.5, negative_slope=1e-2
+    ):
         super(DiscriminatorFNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
         input_size = sequence_len * features
-        negative_slope = 1e-2
         self.fnn = nn.Sequential(
-            nn.Dropout(p=dropout),
-            nn.Linear(input_size, 2 * input_size),
-            nn.LeakyReLU(negative_slope, inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(2 * input_size, 4 * input_size),
-            nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(4*input_size, 6*input_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(6*input_size, 4*input_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(4*input_size, 2*input_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(4 * input_size, 1),
+            *dense_block(input_size, 2 * input_size, dropout, negative_slope),
+            *dense_block(2 * input_size, 4 * input_size, dropout, negative_slope),
+            *dense_block(4 * input_size, out_features, dropout, None),
         )
         self.sigmoid = nn.Sigmoid()
 
@@ -62,26 +70,16 @@ class DiscriminatorFNN(nn.Module):
 
 
 class GeneratorFNN(nn.Module):
-    def __init__(self, latent_vector_size: int, features: int, sequence_len: int, dropout: float = 0.5):
+    def __init__(
+        self, latent_vector_size: int, features: int, sequence_len: int, dropout: float = 0.5, negative_slope=1e-2
+    ):
         super(GeneratorFNN, self).__init__()
         self.features = features
         self.sequence_len = sequence_len
-        negative_slope = 1e-2
         self.fnn = nn.Sequential(
-            nn.Dropout(p=dropout),
-            nn.Linear(latent_vector_size, 2 * latent_vector_size),
-            nn.LeakyReLU(negative_slope, inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(2 * latent_vector_size, 4 * latent_vector_size),
-            nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(4*latent_vector_size, 6*latent_vector_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(6*latent_vector_size, 4*latent_vector_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            # nn.Linear(4*latent_vector_size, 2*latent_vector_size),
-            # nn.LeakyReLU(negative_slope, inplace=True),
-            nn.Dropout(p=dropout),
-            nn.Linear(4 * latent_vector_size, features * sequence_len),
+            *dense_block(latent_vector_size, 2 * latent_vector_size, dropout, negative_slope),
+            *dense_block(2 * latent_vector_size, 4 * latent_vector_size, dropout, negative_slope),
+            *dense_block(4 * latent_vector_size, features * sequence_len, dropout, None),
         )
         self.tanh = nn.Tanh()
 
@@ -120,7 +118,6 @@ class DiscriminatorCNN(nn.Module):
             # input is (nc) x 24
             nn.Conv1d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
-            # PrintSize(),
             nn.Conv1d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm1d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
@@ -270,6 +267,7 @@ def train(
     params: TrainParameters,
     features_len: int,
     save_path: PurePath,
+    latex_options: Optional[LatexTableOptions] = None,
 ):
     # Learning rate for optimizers
     lr = 1e-3
@@ -282,13 +280,39 @@ def train(
     optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
 
     # generate sample data
-    samples = [generate_sine_features(params=params, device=train_params.device) for params in samples_parameters]
+    samples = [
+        generate_sine_features(params=sample_params, device=params.device) for sample_params in samples_parameters
+    ]
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
 
-    # fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
-    # save_fig(fig, save_path / "train_data_plot")
+    fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
+    save_fig(fig, save_path / "train_data_plot")
+
+    if latex_options:
+        placeholder = "{net_type}"
+        d_latex_options = LatexTableOptions(
+            label=latex_options.label.replace(placeholder, "discriminator"),
+            caption=latex_options.caption.replace(placeholder, "Diskriminator"),
+        )
+        g_latex_options = LatexTableOptions(
+            label=latex_options.label.replace(placeholder, "generator"),
+            caption=latex_options.caption.replace(placeholder, "Generator"),
+        )
+        row_len = 90
+        spacer = "%"
+        spacer_line = spacer * row_len
+        padding_space = row_len - len(latex_options.label) - 2
+        left_pad = padding_space // 2 + (1 if padding_space % 2 == 1 else 0)
+        right_pad = padding_space // 2
+        print(spacer_line)
+        print(f"{spacer*left_pad} {latex_options.label} {spacer*right_pad}")
+        print(spacer_line)
+        print(create_summary(G, (params.latent_vector_size,)).to_latex_table(options=g_latex_options))
+        print("")
+        print(create_summary(D, (params.sequence_len * features_len,)).to_latex_table(options=d_latex_options))
+        print(spacer_line)
 
     print(f"Preparing training data for: {save_path.name}")
     print(f"Start training with samples:")
@@ -313,7 +337,9 @@ def train(
     ):
         for batch_idx, (data_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
-            data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len).to(device)
+            data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len).to(
+                params.device
+            )
             # data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
 
             # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
@@ -399,7 +425,6 @@ def train(
 
     fig, ax = plot_model_losses(G_losses, D_losses, params)
     save_fig(fig, save_path / f"model_losses_after_{params.epochs}.png")
-    plt.close(fig)
     print("End training\n--------------------------------------------")
 
 
@@ -408,6 +433,7 @@ def setup_fnn_models_and_train(
     samples_parameters: list[SineGenerationParameters],
     features_len: int,
     save_path: PurePath,
+    latex_options: Optional[LatexTableOptions],
     dropout: float = 0.5,
 ):
     G = GeneratorFNN(
@@ -429,6 +455,7 @@ def setup_fnn_models_and_train(
         params=params,
         features_len=features_len,
         save_path=save_path,
+        latex_options=latex_options,
     )
     return D, G
 
@@ -444,9 +471,17 @@ def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0
         ),
     ]
-
+    latex_options = LatexTableOptions(
+        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten ohne Regularisierung",
+        label="fnn_sines_net_single_univariate_no_regularization_{net_type}",
+    )
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_single_sample_univariate_no_regularization", 0
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_single_sample_univariate_no_regularization",
+        dropout=0,
+        latex_options=latex_options,
     )
 
 
@@ -461,8 +496,16 @@ def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_bat
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         ),
     ]
+    latex_options = LatexTableOptions(
+        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten",
+        label="fnn_sines_net_single_univariate_{net_type}",
+    )
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_noisy_single_sample_univariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_noisy_single_sample_univariate",
+        latex_options=latex_options,
     )
 
 
@@ -477,8 +520,16 @@ def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         )
     ]
+    latex_options = LatexTableOptions(
+        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
+        label="fnn_sines_net_single_multivariate_{net_type}",
+    )
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_single_sample_multivariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_single_sample_multivariate",
+        latex_options=latex_options,
     )
 
 
@@ -499,7 +550,10 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
         ),
     ]
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_multiple_sample_univariate",
     )
 
 
@@ -591,14 +645,12 @@ def setup_rnn_models_and_train(
     params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath
 ):
     G = GeneratorRNN(
-        latent_vector_size=train_params.latent_vector_size,
+        latent_vector_size=params.latent_vector_size,
         features=features_len,
-        sequence_len=train_params.sequence_len,
+        sequence_len=params.sequence_len,
     ).to(params.device)
 
-    D = DiscriminatorRNN(features=features_len, out_features=1, sequence_len=train_params.sequence_len).to(
-        params.device
-    )
+    D = DiscriminatorRNN(features=features_len, out_features=1, sequence_len=params.sequence_len).to(params.device)
 
     train(
         G=G,
@@ -644,7 +696,7 @@ def save_multi_sample_multivariate_training_data_sample_overview(params: TrainPa
     save_fig(fig, save_path / "train_data_plot.pdf")
 
 
-if __name__ == "__main__":
+def main():
     sns.set_theme()
     sns.set_context("paper")
     # sns.set_palette("colorblind")
@@ -662,41 +714,21 @@ if __name__ == "__main__":
     sample_batches = train_params.batch_size * 128
 
     # save sample image for synthetic test data
-    # save_multi_sample_multivariate_training_data_sample_overview(train_params)
+    save_multi_sample_multivariate_training_data_sample_overview(train_params)
 
-    # FNN trainings
-    # Print Fnn Nets
-    plot_features = 2
-    plot_dropout = 0.5
-    G = GeneratorFNN(
-        latent_vector_size=train_params.latent_vector_size,
-        features=plot_features,
-        sequence_len=train_params.sequence_len,
-        dropout=plot_dropout,
-    )
-    # print(
-    #    create_summary(G, (train_params.latent_vector_size,)).to_latex_table(
-    #        options=LatexTableOptions("fnn_generator_sines_net_structure")
-    #    )
-    # )
-    D = DiscriminatorFNN(
-        features=plot_features, sequence_len=train_params.sequence_len, out_features=1, dropout=plot_dropout
-    )
-    # print(
-    #    create_summary(D, (train_params.sequence_len * plot_features,)).to_latex_table(
-    #        options=LatexTableOptions("fnn_diskriminator_sines_net_structure")
-    #    )
-    # )
-
-    train_fnn_single_sample_univariate_no_regularization(train_params, sample_batches)
-    train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
-    # train_fnn_single_sample_multivariate(train_params, sample_batches)
+    # train_fnn_single_sample_univariate_no_regularization(train_params, sample_batches)
+    # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
+    train_fnn_single_sample_multivariate(train_params, sample_batches)
     # train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
     # CNN trainings
     # train_cnn_single_sample_univariate(train_params, sample_batches)
-    # train_cnn_single_sample_multivariate(train_params, sample_batches)
+    train_cnn_single_sample_multivariate(train_params, sample_batches)
     # train_cnn_multiple_sample_univariate(train_params, sample_batches)
 
     # RNN
     # train_rnn_multiple_sample_univariate(train_params, sample_batches)
+
+
+if __name__ == "__main__":
+    main()

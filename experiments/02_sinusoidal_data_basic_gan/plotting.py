@@ -91,16 +91,16 @@ def plot_train_data_overlayed(
 
     def create_sample_legend_string(idx: int, samples_parameters: SineGenerationParameters) -> str:
         amplitude_vec = str(sample_params.amplitudes)
-        sequence_len = str(params.sequence_len)
+        sequence_len = r"s"  # str(params.sequence_len)
 
         random_var_name = chr(65 + ((idx + 23) % 26))  # 0 => X, 1 => Y ...
         eq = r"$"
         eq += random_var_name
         eq += r"_{[t]_{"
-        eq += r"s"  # sequence_len
+        eq += sequence_len
         eq += r"}} \sim "
         eq += r"\sin(\frac{2\pi t}{"
-        eq += r"s"  # sequence_len
+        eq += sequence_len
         eq += r"})"
         eq += r" \cdot "
         eq += amplitude_vec

@@ -41,14 +41,16 @@ def translate(key: SummaryColumn, lang: Language = "de") -> str:
 
 @dataclass
 class LatexTableOptions:
-    label: str
+    label: Optional[str] = None
+    caption: Optional[str] = None
+    positioning: Optional[str] = "htb"
     style: Optional[any] = None  # TODO TBD
 
 
 @dataclass
 class LatexColumn:
     key: str
-    h_align: Literal["l", "c", "r"]
+    h_align: Literal["l", "c", "r"] = "l"
     style: Optional[any] = None  # TODO TBD
 
 
@@ -171,11 +173,11 @@ class TotalSummary:
 def default_column_setup() -> list[LatexColumn]:
     return [
         LatexColumn(key=SummaryColumn.LAYER_IDX, h_align="c"),
-        LatexColumn(key=SummaryColumn.LAYER_TYPE, h_align="l"),
-        LatexColumn(key=SummaryColumn.LAYER_PARAMETERS, h_align="l"),
-        LatexColumn(key=SummaryColumn.INPUT_SHAPE, h_align="l"),
-        LatexColumn(key=SummaryColumn.OUTPUT_SHAPE, h_align="l"),
-        LatexColumn(key=SummaryColumn.NUMBER_PARAMS, h_align="l"),
+        LatexColumn(key=SummaryColumn.LAYER_TYPE),
+        LatexColumn(key=SummaryColumn.LAYER_PARAMETERS),
+        LatexColumn(key=SummaryColumn.INPUT_SHAPE),
+        LatexColumn(key=SummaryColumn.OUTPUT_SHAPE),
+        LatexColumn(key=SummaryColumn.NUMBER_PARAMS),
     ]
 
 
@@ -211,7 +213,10 @@ class NetSummary:
         header_names = [translate(col.key, lang) for col in columns]
 
         table = ""
-        table += r"\begin{table}[]" + "\n"
+        table += r"\begin{table}["
+        if options.positioning:
+            table += options.positioning
+        table += r"]" + "\n"
         column_definition = "|".join([col.h_align for col in columns])
         table += r"\begin{tabular}{" + column_definition + r"}" + "\n"
         table += r"\hline" + "\n"
@@ -236,9 +241,18 @@ class NetSummary:
 
         table += r"\hline" + "\n"
         table += r"\end{tabular}" + "\n"
+
+        # caption
+        table += r"\caption{"
+        if options.caption:
+            table += options.caption
+        table += r"}" + "\n"
+
+        # label
         if options and options.label:
             table += r"\label{table:" + options.label + r"}" + "\n"
-        table += r"\end{table}" + "\n"
+
+        table += r"\end{table}"
 
         return table
 
@@ -265,7 +279,7 @@ def create_summary(
             summary[m_key][SummaryColumn.LAYER_IDX] = module_idx
             summary[m_key][SummaryColumn.LAYER_TYPE] = class_name
             parameter_extractor = parameter_extractors.get(type(module))
-            if parameter_extractor is None:
+            if parameter_extractor is None and type(model) != type(module):
                 print(f"Haven't found a parameter extractor for {type(module)}")
             summary[m_key][SummaryColumn.LAYER_PARAMETERS] = (
                 parameter_extractor.extract(module) if parameter_extractor else []

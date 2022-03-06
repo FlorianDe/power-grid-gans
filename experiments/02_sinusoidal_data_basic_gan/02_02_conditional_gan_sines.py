@@ -381,7 +381,7 @@ def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batch
     )
 
 
-if __name__ == "__main__":
+def main():
     sns.set_theme()
     sns.set_context("paper")
     # sns.set_palette("colorblind")
@@ -399,3 +399,7 @@ if __name__ == "__main__":
     # FNN trainings
     # train_fnn_multiple_sample_univariate(train_params, sample_batches)
     train_fnn_multiple_sample_multivariate(train_params, sample_batches)
+
+
+if __name__ == "__main__":
+    main()
