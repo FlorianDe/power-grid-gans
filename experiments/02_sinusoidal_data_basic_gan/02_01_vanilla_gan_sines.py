@@ -21,7 +21,7 @@ from plotting import (
     plot_sample,
     save_fig,
 )
-from src.net.net_summary import LatexTableOptions
+from src.net.net_summary import LatexTableOptions, LatexTableStyle
 from train_typing import TrainParameters, AdamParameters, BatchReshaper, NoiseGenerator
 from sine_data import SineGenerationParameters, generate_sine_features
 from net_parsing import print_net_summary
@@ -605,8 +605,9 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
         )
     ]
     latex_options = LatexTableOptions(
-        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für univariate sinusoidale Daten",
+        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für univariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
         label="cnn_sines_net_single_univariate_{net_type}",
+        style=LatexTableStyle(useTabularx=True, scaleWithAdjustbox=1.4),
     )
 
     return setup_cnn_models_and_train(
@@ -629,8 +630,9 @@ def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches
         ),
     ]
     latex_options = LatexTableOptions(
-        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für multivariate sinusoidale Daten",
+        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für multivariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
         label="cnn_sines_net_single_multivariate_{net_type}",
+        style=LatexTableStyle(useTabularx=True, scaleWithAdjustbox=1.4),
     )
     return setup_cnn_models_and_train(
         params=params,

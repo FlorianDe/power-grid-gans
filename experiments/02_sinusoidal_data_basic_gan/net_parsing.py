@@ -16,10 +16,14 @@ def print_net_summary(
     d_latex_options = LatexTableOptions(
         label=latex_options.label.replace(placeholder, "discriminator"),
         caption=latex_options.caption.replace(placeholder, "Diskriminator"),
+        positioning=latex_options.positioning,
+        style=latex_options.style,
     )
     g_latex_options = LatexTableOptions(
         label=latex_options.label.replace(placeholder, "generator"),
         caption=latex_options.caption.replace(placeholder, "Generator"),
+        positioning=latex_options.positioning,
+        style=latex_options.style,
     )
     row_len = 90
     spacer = "%"
