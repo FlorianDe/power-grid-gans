@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Optional, Type
+from typing import Literal, Optional, Type, Union
 import torch
 import torch.nn as nn
 
@@ -257,6 +257,8 @@ class NetSummary:
         return table
 
 
+# Should be replaced with -> https://github.com/TylerYep/torchinfo
+# The Author of pytorch-summary mentioned it inside the README but should have also archived the github repo...
 def create_summary(
     model,
     input_size,
@@ -308,7 +310,17 @@ def create_summary(
         input_size = [input_size]
 
     # batch_size of 2 for batchnorm
-    x = [torch.rand(2, *in_size).type(dtype).to(device=device) for in_size, dtype in zip(input_size, dtypes)]
+    def get_model_input_size(in_size: Union[tuple[int], int]) -> torch.Size:
+        if isinstance(in_size, tuple):
+            return (2, *in_size)
+        if isinstance(in_size, int):
+            return 2
+        raise ValueError(f"in_size: {in_size} not supported!")
+
+    x = [
+        torch.rand(get_model_input_size(in_size)).type(dtype).to(device=device)
+        for in_size, dtype in zip(input_size, dtypes)
+    ]
 
     # create properties
     summary = OrderedDict()
@@ -338,7 +350,9 @@ def create_summary(
                 trainable_params += summary[layer][SummaryColumn.NUMBER_PARAMS]
 
     # assume 4 bytes/number (float on cuda).
-    total_input_size = abs(np.prod(sum(input_size, ())) * batch_size * 4.0 / (1024**2.0))
+    # total_input_size = abs(np.prod(sum(input_size, ())) * batch_size * 4.0 / (1024**2.0))
+    # Fix from https://github.com/sksq96/pytorch-summary/pull/46/commits/f9c420e46d248026136f033905a8a2507b196a6c
+    total_input_size = abs(np.sum([np.prod(in_tuple) for in_tuple in input_size]) * batch_size * 4.0 / (1024**2.0))
     total_output_size = abs(2.0 * total_output * 4.0 / (1024**2.0))  # x2 for gradients
     total_params_size = abs(total_params * 4.0 / (1024**2.0))
     total_size = total_params_size + total_output_size + total_input_size
