@@ -605,7 +605,7 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
         )
     ]
     latex_options = LatexTableOptions(
-        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für univariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
+        caption="DCGAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für univariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
         label="cnn_sines_net_single_univariate_{net_type}",
         style=LatexTableStyle(useTabularx=True, scaleWithAdjustbox=1.4),
     )
@@ -630,7 +630,7 @@ def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches
         ),
     ]
     latex_options = LatexTableOptions(
-        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für multivariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
+        caption="DCGAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für multivariate sinusoidale Daten. Die Abkürzungen der Optionen entsprechen: in=in\_channels, out=out\_channels, k=kernel\_size, s=stride, p=padding, op=output\_padding, pm=padding\_mode, d=dilation, g=groups, e=epsilon.",
         label="cnn_sines_net_single_multivariate_{net_type}",
         style=LatexTableStyle(useTabularx=True, scaleWithAdjustbox=1.4),
     )
