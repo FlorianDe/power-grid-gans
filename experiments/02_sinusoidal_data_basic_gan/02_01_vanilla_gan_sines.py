@@ -1,6 +1,6 @@
 from string import Template
 from pathlib import PurePath
-from typing import Callable, Optional
+from typing import Optional
 from tqdm import tqdm
 import seaborn as sns
 
@@ -13,7 +13,6 @@ import torch.optim as optim
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-# from src.net.net_summary import LatexTableOptions, create_summary
 from experiments.utils import get_experiments_folder, set_latex_plot_params
 from plotting import (
     plot_model_losses,
@@ -22,9 +21,10 @@ from plotting import (
     plot_sample,
     save_fig,
 )
-from src.net.net_summary import LatexTableOptions, create_summary
-from train_typing import TrainParameters
+from src.net.net_summary import LatexTableOptions
+from train_typing import TrainParameters, AdamParameters, BatchReshaper, NoiseGenerator
 from sine_data import SineGenerationParameters, generate_sine_features
+from net_parsing import print_net_summary
 
 save_images_path = (
     get_experiments_folder().joinpath("02_sinusoidal_data_basic_gan").joinpath("02_01_vanilla_gan_fnn_sines")
@@ -132,6 +132,7 @@ class DiscriminatorCNN(nn.Module):
             # PrintSize(),
             nn.Conv1d(ndf * 8, out_features, 2, 1, 0, bias=False),
             nn.Sigmoid(),
+            # nn.LeakyReLU(0.2, inplace=True),
         )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -261,23 +262,22 @@ class GeneratorRNN(nn.Module):
 def train(
     G: nn.Module,
     D: nn.Module,
-    batch_reshaper: Callable[[Tensor], Tensor],
-    noise_generator: Callable[[int, TrainParameters, int], Tensor],
+    batch_reshaper: BatchReshaper,
+    noise_generator: NoiseGenerator,
     samples_parameters: list[SineGenerationParameters],
     params: TrainParameters,
     features_len: int,
     save_path: PurePath,
     latex_options: Optional[LatexTableOptions] = None,
+    plots_file_ending: str = "pdf",
 ):
-    # Learning rate for optimizers
-    lr = 1e-3
-    # Beta1 hyperparam for Adam optimizers
-    beta1 = 0.9
+    beta1 = params.optimizer_parameters.beta1
+    beta2 = params.optimizer_parameters.beta2
 
     criterion = nn.BCELoss()
 
-    optimizerD = optim.Adam(D.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(D.parameters(), lr=params.optimizer_parameters.lr, betas=(beta1, beta2))
+    optimizerG = optim.Adam(G.parameters(), lr=params.optimizer_parameters.lr, betas=(beta1, beta2))
 
     # generate sample data
     samples = [
@@ -286,33 +286,15 @@ def train(
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
+    loss_save_path = save_path / "losses"
+    loss_save_path.mkdir(parents=True, exist_ok=True)
+    distributions_save_path = save_path / "distributions"
+    distributions_save_path.mkdir(parents=True, exist_ok=True)
+    sample_save_path = save_path / "sample"
+    sample_save_path.mkdir(parents=True, exist_ok=True)
 
     fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
-    save_fig(fig, save_path / "train_data_plot")
-
-    if latex_options:
-        placeholder = "{net_type}"
-        d_latex_options = LatexTableOptions(
-            label=latex_options.label.replace(placeholder, "discriminator"),
-            caption=latex_options.caption.replace(placeholder, "Diskriminator"),
-        )
-        g_latex_options = LatexTableOptions(
-            label=latex_options.label.replace(placeholder, "generator"),
-            caption=latex_options.caption.replace(placeholder, "Generator"),
-        )
-        row_len = 90
-        spacer = "%"
-        spacer_line = spacer * row_len
-        padding_space = row_len - len(latex_options.label) - 2
-        left_pad = padding_space // 2 + (1 if padding_space % 2 == 1 else 0)
-        right_pad = padding_space // 2
-        print(spacer_line)
-        print(f"{spacer*left_pad} {latex_options.label} {spacer*right_pad}")
-        print(spacer_line)
-        print(create_summary(G, (params.latent_vector_size,)).to_latex_table(options=g_latex_options))
-        print("")
-        print(create_summary(D, (params.sequence_len * features_len,)).to_latex_table(options=d_latex_options))
-        print(spacer_line)
+    save_fig(fig, save_path / f"train_data_plot.{plots_file_ending}")
 
     print(f"Preparing training data for: {save_path.name}")
     print(f"Start training with samples:")
@@ -327,25 +309,34 @@ def train(
         # num_workers=workers
         # pin_memory=True,
     )
+    if latex_options:
+        data_batch = next(iter(dataloader))
+        discriminator_input_size = batch_reshaper(data_batch, params.batch_size, params.sequence_len, features_len)[
+            0
+        ].size()
+        generator_input_size = noise_generator(params.batch_size, params, features_len)[0].size()
+        print_net_summary(
+            G=G,
+            D=D,
+            generator_input_size=generator_input_size,
+            discriminator_input_size=discriminator_input_size,
+            latex_options=latex_options,
+        )
 
     G_losses = []
     D_losses = []
     iters = 0
 
     for epoch in (
-        progress := tqdm(range(params.epochs), unit="epochs", bar_format="{desc}{percentage:3.0f}%|{bar:10}{r_bar}")
+        progress := tqdm(
+            range(1, params.epochs + 1), unit="epochs", bar_format="{desc}{percentage:3.0f}%|{bar:10}{r_bar}"
+        )
     ):
         for batch_idx, (data_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
             data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len).to(
                 params.device
             )
-            # data_batch = data_batch.view(current_batch_size, -1) # FNN PREPARATION
-
-            # data_batch = data_batch.view(current_batch_size, features_len, params.sequence_len) # CNN PREPARATION
-            # data_batch = torch.transpose(data_batch, 1, 2)  # CNN PREPARATION # CNN BROKEN!
-
-            # data_batch = data_batch.view(current_batch_size, params.sequence_len, features_len) # RNN PREPARATION
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -384,7 +375,7 @@ def train(
             D_G_z2 = d_out_fake.mean().item()
             optimizerG.step()
 
-            if iters % 20 == 0:
+            if iters % 40 == 0:
                 # padded_epoch = str(epoch).ljust(len(str(params.epochs)))
                 # padded_batch_idx = str(batch_idx).ljust(len(str(len(dataloader))))
                 progress_str = "Loss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f" % (
@@ -402,7 +393,7 @@ def train(
 
             iters += 1
 
-        if epoch % 2 == 0:
+        if epoch % 10 == 0:
             with torch.no_grad():
                 generated_sample_count = 7
                 noise = noise_generator(generated_sample_count, params, features_len)
@@ -411,7 +402,7 @@ def train(
                 generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
                 fig, ax = plot_sample(sample=generated_sine, params=params, plot=(fig, ax))
-                save_fig(fig, save_path / f"{epoch}.png")
+                save_fig(fig, sample_save_path / f"sample_after_{epoch}.{plots_file_ending}")
 
             with torch.no_grad():
                 generated_sample_count = 100
@@ -421,10 +412,14 @@ def train(
                 for feature_idx, (fig, ax) in enumerate(
                     plot_box_plot_per_ts(data=generated_sine, epoch=epoch, samples=samples, params=params)
                 ):
-                    save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
+                    save_fig(
+                        fig,
+                        distributions_save_path
+                        / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.{plots_file_ending}",
+                    )
 
-    fig, ax = plot_model_losses(G_losses, D_losses, params)
-    save_fig(fig, save_path / f"model_losses_after_{params.epochs}.png")
+            fig, ax = plot_model_losses(G_losses, D_losses, epoch)
+            save_fig(fig, loss_save_path / f"losses_after_{epoch}.{plots_file_ending}")
     print("End training\n--------------------------------------------")
 
 
@@ -464,7 +459,7 @@ def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters
     """
     This should give us a baseline for the simplest training possible
     """
-    amplitudes = [1.0]
+    amplitudes = [0.75]
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
         SineGenerationParameters(
@@ -472,7 +467,7 @@ def train_fnn_single_sample_univariate_no_regularization(params: TrainParameters
         ),
     ]
     latex_options = LatexTableOptions(
-        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten ohne Regularisierung",
+        caption="Vanilla GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten ohne Regularisierung",
         label="fnn_sines_net_single_univariate_no_regularization_{net_type}",
     )
     setup_fnn_models_and_train(
@@ -489,15 +484,15 @@ def train_fnn_noisy_single_sample_univariate(params: TrainParameters, sample_bat
     """
     Check how it affects the training if we add some noise on top of the training data
     """
-    amplitudes = [1.0]
+    amplitudes = [0.75]
     features_len = len(amplitudes)
     samples_parameters: list[SineGenerationParameters] = [
         SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
+            sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.05
         ),
     ]
     latex_options = LatexTableOptions(
-        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten",
+        caption="Vanilla GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für univariate sinusoidale Daten",
         label="fnn_sines_net_single_univariate_{net_type}",
     )
     setup_fnn_models_and_train(
@@ -521,7 +516,7 @@ def train_fnn_single_sample_multivariate(params: TrainParameters, sample_batches
         )
     ]
     latex_options = LatexTableOptions(
-        caption="{net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
+        caption="Vanilla GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
         label="fnn_sines_net_single_multivariate_{net_type}",
     )
     setup_fnn_models_and_train(
@@ -542,9 +537,9 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
         SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[1], times=sample_batches, noise_scale=0.01
         ),
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0.01
-        ),
+        # SineGenerationParameters(
+        #     sequence_len=params.sequence_len, amplitudes=[0.75], times=sample_batches, noise_scale=0.01
+        # ),
         SineGenerationParameters(
             sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
         ),
@@ -554,6 +549,7 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
         samples_parameters=samples_parameters,
         features_len=features_len,
         save_path=save_images_path / "fnn_multiple_sample_univariate",
+        latex_options=None,
     )
 
 
@@ -567,7 +563,11 @@ def weights_init(m):
 
 
 def setup_cnn_models_and_train(
-    params: TrainParameters, samples_parameters: list[SineGenerationParameters], features_len: int, save_path: PurePath
+    params: TrainParameters,
+    samples_parameters: list[SineGenerationParameters],
+    features_len: int,
+    save_path: PurePath,
+    latex_options: LatexTableOptions,
 ):
     G = GeneratorCNN(
         latent_vector_size=params.latent_vector_size,
@@ -588,6 +588,7 @@ def setup_cnn_models_and_train(
         params=params,
         features_len=features_len,
         save_path=save_path,
+        latex_options=latex_options,
     )
     return G
 
@@ -603,8 +604,40 @@ def train_cnn_single_sample_univariate(params: TrainParameters, sample_batches: 
             sequence_len=params.sequence_len, amplitudes=amplitudes, times=sample_batches, noise_scale=0.01
         )
     ]
+    latex_options = LatexTableOptions(
+        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für univariate sinusoidale Daten",
+        label="cnn_sines_net_single_univariate_{net_type}",
+    )
+
     return setup_cnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "cnn_single_sample_univariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "cnn_single_sample_univariate",
+        latex_options=latex_options,
+    )
+
+
+def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
+    """
+    XXXX
+    """
+    features_len = 2
+    samples_parameters: list[SineGenerationParameters] = [
+        SineGenerationParameters(
+            sequence_len=params.sequence_len, amplitudes=[1, 0.5], times=sample_batches, noise_scale=0.01
+        ),
+    ]
+    latex_options = LatexTableOptions(
+        caption="Vanilla GAN {net_type}-Netz in Form eines Convolutional Neuronal Networks für multivariate sinusoidale Daten",
+        label="cnn_sines_net_single_multivariate_{net_type}",
+    )
+    return setup_cnn_models_and_train(
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "cnn_single_sample_multivariate",
+        latex_options=latex_options,
     )
 
 
@@ -621,23 +654,13 @@ def train_cnn_multiple_sample_univariate(params: TrainParameters, sample_batches
             sequence_len=params.sequence_len, amplitudes=[0.5], times=sample_batches, noise_scale=0.01
         ),
     ]
-    return setup_cnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "cnn_multiple_sample_univariate"
-    )
 
-
-def train_cnn_single_sample_multivariate(params: TrainParameters, sample_batches: int):
-    """
-    XXXX
-    """
-    features_len = 2
-    samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[1, 0.5], times=sample_batches, noise_scale=0.01
-        ),
-    ]
     return setup_cnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "cnn_single_sample_multivariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "cnn_multiple_sample_univariate",
+        latex_options=None,
     )
 
 
@@ -710,21 +733,26 @@ def main():
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
 
-    train_params = TrainParameters(batch_size=16, epochs=50, device=device)
-    sample_batches = train_params.batch_size * 128
+    batch_size = 16
+    sample_batches = batch_size * 128
 
+    fnn_train_params = TrainParameters(batch_size=16, epochs=4000, device=device)
     # save sample image for synthetic test data
-    save_multi_sample_multivariate_training_data_sample_overview(train_params)
+    save_multi_sample_multivariate_training_data_sample_overview(fnn_train_params)
 
     # train_fnn_single_sample_univariate_no_regularization(train_params, sample_batches)
     # train_fnn_noisy_single_sample_univariate(train_params, sample_batches)
-    train_fnn_single_sample_multivariate(train_params, sample_batches)
+    # train_fnn_single_sample_multivariate(train_params, sample_batches)
     # train_fnn_multiple_sample_univariate(train_params, sample_batches)
 
     # CNN trainings
-    # train_cnn_single_sample_univariate(train_params, sample_batches)
-    train_cnn_single_sample_multivariate(train_params, sample_batches)
-    # train_cnn_multiple_sample_univariate(train_params, sample_batches)
+    cnn_optimizer_parameters = AdamParameters(lr=0.0002, beta1=0.5)
+    cnn_train_params = TrainParameters(
+        batch_size=128, epochs=4000, optimizer_parameters=cnn_optimizer_parameters, device=device
+    )
+    # train_cnn_single_sample_univariate(cnn_train_params, sample_batches)
+    train_cnn_single_sample_multivariate(cnn_train_params, sample_batches)
+    # train_cnn_multiple_sample_univariate(cnn_train_params, sample_batches)
 
     # RNN
     # train_rnn_multiple_sample_univariate(train_params, sample_batches)

@@ -236,7 +236,7 @@ def plot_box_plot_per_ts(
         # save_fig(fig, save_path / f"distribution_result_epoch_{epoch}_feature_{feature_idx}.png")
 
 
-def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainParameters) -> tuple[Figure, Axes]:
+def plot_model_losses(g_losses: list[any], d_losses: list[any], current_epoch: int) -> tuple[Figure, Axes]:
     fig, ax_iter = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
 
     # ax_iter.set_title("Generator und Diskriminator Loss")
@@ -247,7 +247,7 @@ def plot_model_losses(g_losses: list[any], d_losses: list[any], params: TrainPar
     ax_iter.set_ylabel(translate(SimpleGanPlotResultColumns.LOSS))
 
     max_iterations = len(g_losses)
-    max_epochs = params.epochs
+    max_epochs = current_epoch
 
     def iter2epoch(iter):
         return max_epochs * (iter / max_iterations)
