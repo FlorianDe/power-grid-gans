@@ -39,6 +39,20 @@ def translate(key: SummaryColumn, lang: Language = "de") -> str:
     return __PLOT_DICT[key][lang]
 
 
+def toScalarIfSingleDimension(size: Union[str, Tuple[int, ...]]):
+    if isinstance(size, str):
+        return size
+    if len(size) == 1:
+        return size[0]
+    return size
+
+
+@dataclass
+class LatexTableStyle:
+    useTabularx: bool = False
+    scaleWithAdjustbox: Optional[float] = None
+
+
 @dataclass
 class LatexTableOptions:
     label: Optional[str] = None
