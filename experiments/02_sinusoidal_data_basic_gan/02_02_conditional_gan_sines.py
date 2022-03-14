@@ -155,7 +155,7 @@ def train(
     sample_save_path.mkdir(parents=True, exist_ok=True)
 
     fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
-    save_fig(fig, save_path / "train_data_plot")
+    save_fig(fig, save_path / f"train_data_plot.{plots_file_ending}")
 
     print(f"Preparing training data for: {save_path.name}")
     print(f"Start training with samples:")
@@ -441,7 +441,7 @@ def main():
     sample_batches = train_params.batch_size * 128
 
     # FNN trainings
-    train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
     train_fnn_multiple_sample_multivariate(train_params, sample_batches)
 
 
