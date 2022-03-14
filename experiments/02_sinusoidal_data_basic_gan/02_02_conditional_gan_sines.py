@@ -1,5 +1,5 @@
 from pathlib import PurePath
-from typing import Callable
+from typing import Callable, Optional
 from tqdm import tqdm
 import seaborn as sns
 
@@ -10,14 +10,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from torch import Tensor
+from torch import Size, Tensor
 from torch.utils.data import DataLoader, TensorDataset
 
 from experiments.utils import get_experiments_folder, set_latex_plot_params
 
 from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
 from sine_data import SineGenerationParameters, generate_sine_features
-from train_typing import TrainParameters, ConditionalTrainParameters
+from src.net.net_summary import LatexTableOptions
+from train_typing import TrainParameters, ConditionalTrainParameters, BatchReshaper, NoiseGenerator
+from net_parsing import print_net_summary
 
 save_images_path = (
     get_experiments_folder().joinpath("02_sinusoidal_data_basic_gan").joinpath("02_02_conditional_gan_sines")
@@ -120,12 +122,14 @@ class GeneratorFNN(nn.Module):
 def train(
     G: nn.Module,
     D: nn.Module,
-    batch_reshaper: Callable[[Tensor], Tensor],
-    noise_generator: Callable[[int, TrainParameters, int], Tensor],
+    batch_reshaper: BatchReshaper,
+    noise_generator: NoiseGenerator,
     samples_parameters: list[SineGenerationParameters],
     params: TrainParameters,
     features_len: int,
     save_path: PurePath,
+    latex_options: Optional[LatexTableOptions] = None,
+    plots_file_ending: str = "pdf",
 ):
     # Learning rate for optimizers
     lr = 1e-3
@@ -143,6 +147,12 @@ def train(
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
+    loss_save_path = save_path / "losses"
+    loss_save_path.mkdir(parents=True, exist_ok=True)
+    distributions_save_path = save_path / "distributions"
+    distributions_save_path.mkdir(parents=True, exist_ok=True)
+    sample_save_path = save_path / "sample"
+    sample_save_path.mkdir(parents=True, exist_ok=True)
 
     fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
     save_fig(fig, save_path / "train_data_plot")
@@ -164,12 +174,30 @@ def train(
         # num_workers=workers
     )
 
+    if latex_options:
+        (data_batch, conditions_batch) = next(iter(dataloader))
+        discriminator_input_size = batch_reshaper(data_batch, params.batch_size, params.sequence_len, features_len)[
+            0
+        ].size()
+        generator_input_size = noise_generator(params.batch_size, params, features_len)[0].size()
+        conditions_size = 1
+        print_net_summary(
+            G=G,
+            D=D,
+            generator_input_size=[generator_input_size, conditions_size],
+            discriminator_input_size=[discriminator_input_size, conditions_size],
+            latex_options=latex_options,
+            dtypes=[torch.FloatTensor, torch.IntTensor],
+        )
+
     G_losses = []
     D_losses = []
     iters = 0
 
     for epoch in (
-        progress := tqdm(range(params.epochs), unit="epochs", bar_format="{desc}{percentage:3.0f}%|{bar:10}{r_bar}")
+        progress := tqdm(
+            range(1, params.epochs + 1), unit="epochs", bar_format="{desc}{percentage:3.0f}%|{bar:10}{r_bar}"
+        )
     ):
         for batch_idx, (data_batch, conditions_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
@@ -234,7 +262,7 @@ def train(
 
             iters += 1
 
-        if epoch % 2 == 0:
+        if epoch % 10 == 0:
             for cond_idx, sample in enumerate(samples):
                 with torch.no_grad():
                     generated_sample_count = 7
@@ -244,7 +272,7 @@ def train(
                     generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
                     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
                     fig, ax = plot_sample(sample=generated_sine, params=params, plot=(fig, ax), condition=cond_idx)
-                    save_fig(fig, save_path / f"{epoch}_cond_{cond_idx}.png")
+                    save_fig(fig, sample_save_path / f"{epoch}_cond_{cond_idx}.{plots_file_ending}")
 
                 with torch.no_grad():
                     generated_sample_count = 100
@@ -258,12 +286,14 @@ def train(
                         )
                     ):
                         save_fig(
-                            fig, save_path / f"distribution_epoch_{epoch}_cond_{cond_idx}_feature_{feature_idx}.png"
+                            fig,
+                            distributions_save_path
+                            / f"distribution_epoch_{epoch}_cond_{cond_idx}_feature_{feature_idx}.{plots_file_ending}",
                         )
 
-    fig, ax = plot_model_losses(G_losses, D_losses, params)
-    save_fig(fig, save_path / f"model_losses_after_{params.epochs}.png")
-    plt.close(fig)
+            fig, ax = plot_model_losses(g_losses=G_losses, d_losses=D_losses, current_epoch=epoch)
+            save_fig(fig, loss_save_path / f"losses_after_{epoch}.{plots_file_ending}")
+            plt.close(fig)
     print("End training\n--------------------------------------------")
 
 
@@ -311,7 +341,8 @@ def setup_fnn_models_and_train(
     samples_parameters: list[SineGenerationParameters],
     features_len: int,
     save_path: PurePath,
-    dropout: float = 0.4,
+    latex_options: Optional[LatexTableOptions],
+    dropout: float = 0.5,
 ):
     conditions = len(samples_parameters)
     G = GeneratorFNN(
@@ -341,13 +372,14 @@ def setup_fnn_models_and_train(
         params=params,
         features_len=features_len,
         save_path=save_path,
+        latex_options=latex_options,
     )
     return D, G
 
 
 def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
     """
-    This should result in a mode collapse
+    Baseline for conditional GAN with FNN
     """
     features_len = 1
     samples_parameters: list[SineGenerationParameters] = [
@@ -359,13 +391,17 @@ def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches
         ),
     ]
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_univariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_multiple_sample_univariate",
+        latex_options=None,
     )
 
 
 def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batches: int):
     """
-    This should result in a mode collapse
+    Multivariate for conditional GAN with FNN
     """
     features_len = 2
     samples_parameters: list[SineGenerationParameters] = [
@@ -376,8 +412,16 @@ def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batch
             sequence_len=params.sequence_len, amplitudes=[0.5, 0.2], times=sample_batches, noise_scale=0.01
         ),
     ]
+    latex_options = LatexTableOptions(
+        caption="Conditional GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
+        label="conditional_gan_fnn_sines_net_multiple_multivariate_{net_type}",
+    )
     setup_fnn_models_and_train(
-        params, samples_parameters, features_len, save_images_path / "fnn_multiple_sample_multivariate"
+        params=params,
+        samples_parameters=samples_parameters,
+        features_len=features_len,
+        save_path=save_images_path / "fnn_multiple_sample_multivariate",
+        latex_options=latex_options,
     )
 
 
@@ -393,11 +437,11 @@ def main():
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
 
-    train_params = ConditionalTrainParameters(epochs=110, embedding_dim=20)
-    sample_batches = train_params.batch_size * 100
+    train_params = ConditionalTrainParameters(batch_size=16, epochs=4000, embedding_dim=32)
+    sample_batches = train_params.batch_size * 128
 
     # FNN trainings
-    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
+    train_fnn_multiple_sample_univariate(train_params, sample_batches)
     train_fnn_multiple_sample_multivariate(train_params, sample_batches)
 
 
