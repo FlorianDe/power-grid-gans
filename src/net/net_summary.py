@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Optional, Type, Union
+from typing import Literal, Optional, Tuple, Type, Union
 import torch
 import torch.nn as nn
 
@@ -58,13 +58,13 @@ class LatexTableOptions:
     label: Optional[str] = None
     caption: Optional[str] = None
     positioning: Optional[str] = "htb"
-    style: Optional[any] = None  # TODO TBD
+    style: Optional[any] = LatexTableStyle()
 
 
 @dataclass
 class LatexColumn:
     key: str
-    h_align: Literal["l", "c", "r"] = "l"
+    h_align: Literal["l", "c", "r", "X"] = "l"
     style: Optional[any] = None  # TODO TBD
 
 
@@ -75,7 +75,7 @@ class ParameterDescription:
     value: any
 
     def __str__(self):
-        return self.label + " = " + str(self.value)
+        return self.label + "=" + str(self.value)
 
 
 class ParameterExtractor(ABC):
@@ -140,6 +140,60 @@ class LeakyReLUParameterExtractor(ParameterExtractor):
         ]
 
 
+class Conv1dParameterExtractor(ParameterExtractor):
+    def __init__(self):
+        ParameterExtractor.__init__(self, nn.Conv1d)
+
+    def _extract(self, module: nn.Conv1d) -> list[ParameterDescription]:
+        return [
+            ParameterDescription("in_channels", "in", module.in_channels),
+            ParameterDescription("out_channels", "out", module.out_channels),
+            ParameterDescription("kernel_size", "k", toScalarIfSingleDimension(module.kernel_size)),
+            ParameterDescription("stride", "s", toScalarIfSingleDimension(module.stride)),
+            ParameterDescription("padding", "p", toScalarIfSingleDimension(module.padding)),
+            ParameterDescription("padding_mode", "pm", toScalarIfSingleDimension(module.padding_mode)),
+            ParameterDescription("dilation", "d", toScalarIfSingleDimension(module.dilation)),
+            ParameterDescription("groups", "g", module.groups),
+        ]
+
+
+class ConvTranspose1dParameterExtractor(ParameterExtractor):
+    def __init__(self):
+        ParameterExtractor.__init__(self, nn.ConvTranspose1d)
+
+    def _extract(self, module: nn.ConvTranspose1d) -> list[ParameterDescription]:
+        return [
+            ParameterDescription("in_channels", "in", module.in_channels),
+            ParameterDescription("out_channels", "out", module.out_channels),
+            ParameterDescription("kernel_size", "k", toScalarIfSingleDimension(module.kernel_size)),
+            ParameterDescription("stride", "s", toScalarIfSingleDimension(module.stride)),
+            ParameterDescription("padding", "p", toScalarIfSingleDimension(module.padding)),
+            ParameterDescription("output_padding", "op", toScalarIfSingleDimension(module.output_padding)),
+            ParameterDescription("dilation", "d", toScalarIfSingleDimension(module.dilation)),
+            ParameterDescription("groups", "g", module.groups),
+        ]
+
+
+class BatchNorm1dParameterExtractor(ParameterExtractor):
+    def __init__(self):
+        ParameterExtractor.__init__(self, nn.BatchNorm1d)
+
+    def _extract(self, module: nn.BatchNorm1d) -> list[ParameterDescription]:
+        return [
+            ParameterDescription("num_features", "features", module.num_features),
+            ParameterDescription("momentum", "momentum", module.momentum),
+            ParameterDescription("eps", "eps", module.eps),
+        ]
+
+
+class ReLUParameterExtractor(ParameterExtractor):
+    def __init__(self):
+        ParameterExtractor.__init__(self, nn.ReLU)
+
+    def _extract(self, module: nn.ReLU) -> list[ParameterDescription]:
+        return []
+
+
 class TanhParameterExtractor(ParameterExtractor):
     def __init__(self):
         ParameterExtractor.__init__(self, nn.Tanh)
@@ -159,6 +213,8 @@ class SigmoidParameterExtractor(ParameterExtractor):
 if __name__ == "__main__":
     print(ParameterExtractor.createExtractors())
     print([x() for x in ParameterExtractor.__subclasses__()])
+    c1 = nn.Conv1d(10, 10, 5, 2, 1, 2, 1)
+    print(f"{c1.kernel_size=}, toScalarIfSingleDimension={toScalarIfSingleDimension(c1.kernel_size)}")
 
 
 @dataclass
@@ -184,11 +240,22 @@ class TotalSummary:
         return summary_str
 
 
-def default_column_setup() -> list[LatexColumn]:
+def default_tabular_column_setup() -> list[LatexColumn]:
     return [
         LatexColumn(key=SummaryColumn.LAYER_IDX, h_align="c"),
         LatexColumn(key=SummaryColumn.LAYER_TYPE),
         LatexColumn(key=SummaryColumn.LAYER_PARAMETERS),
+        LatexColumn(key=SummaryColumn.INPUT_SHAPE),
+        LatexColumn(key=SummaryColumn.OUTPUT_SHAPE),
+        LatexColumn(key=SummaryColumn.NUMBER_PARAMS),
+    ]
+
+
+def default_tabularx_column_setup() -> list[LatexColumn]:
+    return [
+        LatexColumn(key=SummaryColumn.LAYER_IDX, h_align="c"),
+        LatexColumn(key=SummaryColumn.LAYER_TYPE),
+        LatexColumn(key=SummaryColumn.LAYER_PARAMETERS, h_align="X"),
         LatexColumn(key=SummaryColumn.INPUT_SHAPE),
         LatexColumn(key=SummaryColumn.OUTPUT_SHAPE),
         LatexColumn(key=SummaryColumn.NUMBER_PARAMS),
@@ -220,10 +287,19 @@ class NetSummary:
 
     def to_latex_table(
         self,
-        columns: list[LatexColumn] = default_column_setup(),
+        columns: Optional[list[LatexColumn]] = None,
         lang: Language = "de",
         options: Optional[LatexTableOptions] = None,
     ) -> str:
+        if columns is None:
+            useTabularx: bool = options is not None and options.style is not None and options.style.useTabularx == True
+            columns = default_tabularx_column_setup() if useTabularx else default_tabular_column_setup()
+        tableWidth = r"\textwidth"
+        wrapTabularWithAdjustbox = (
+            options.style
+            and options.style.scaleWithAdjustbox is not None
+            and isinstance(options.style.scaleWithAdjustbox, float)
+        )
         header_names = [translate(col.key, lang) for col in columns]
 
         table = ""
@@ -231,8 +307,12 @@ class NetSummary:
         if options.positioning:
             table += options.positioning
         table += r"]" + "\n"
+        if wrapTabularWithAdjustbox:
+            tableWidth = str(options.style.scaleWithAdjustbox) + r"\textwidth"
+            table += r"\begin{adjustbox}{center,max width=" + tableWidth + r"}" + "\n"
         column_definition = "|".join([col.h_align for col in columns])
-        table += r"\begin{tabular}{" + column_definition + r"}" + "\n"
+        table += r"\begin{tabularx}{" + tableWidth + "}" if options.style.useTabularx else r"\begin{tabular}"
+        table += r"{" + column_definition + r"}" + "\n"
         table += r"\hline" + "\n"
         table += " & ".join(header_names) + r" \\" + "\n"
         table += r"\hline" + "\n"
@@ -244,7 +324,7 @@ class NetSummary:
             line += str(self.summary[layer][SummaryColumn.LAYER_TYPE]) + "&"
             layer_options = self.summary[layer][SummaryColumn.LAYER_PARAMETERS]
             if layer_options and len(layer_options) > 0:
-                line += ", ".join([str(option) for option in layer_options]) + "&"
+                line += ", ".join([str(option).replace(r"_", r"\_") for option in layer_options]) + "&"
             else:
                 line += "-" + "&"
             line += str(self.summary[layer][SummaryColumn.INPUT_SHAPE]) + "&"
@@ -254,8 +334,9 @@ class NetSummary:
             table += line
 
         table += r"\hline" + "\n"
-        table += r"\end{tabular}" + "\n"
-
+        table += (r"\end{tabularx}" if options.style.useTabularx else r"\end{tabular}") + "\n"
+        if wrapTabularWithAdjustbox:
+            table += r"\end{adjustbox}" + "\n"
         # caption
         table += r"\caption{"
         if options.caption:
