@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 import torch
-from torch import Tensor
 import math
 
 
@@ -17,7 +16,7 @@ class SineGenerationParameters:
 
 def generate_sine_features(
     params: SineGenerationParameters, seed: int = 42, device: torch.device = torch.device("cpu")
-) -> Tensor:
+) -> torch.Tensor:
     """
     Returns a multi dimensional sine wave feature of shape [times, sequence_len, features]
     """
