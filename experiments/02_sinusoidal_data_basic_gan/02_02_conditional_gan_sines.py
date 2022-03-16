@@ -17,7 +17,7 @@ from experiments.utils import get_experiments_folder, set_latex_plot_params
 
 from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
 from sine_data import SineGenerationParameters, generate_sine_features
-from src.net.net_summary import LatexTableOptions
+from src.net.net_summary import LatexTableOptions, LatexTableStyle
 from train_typing import TrainParameters, ConditionalTrainParameters, BatchReshaper, NoiseGenerator
 from net_parsing import print_net_summary
 
@@ -415,6 +415,7 @@ def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batch
     latex_options = LatexTableOptions(
         caption="Conditional GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
         label="conditional_gan_fnn_sines_net_multiple_multivariate_{net_type}",
+        style=LatexTableStyle(scaleWithAdjustbox=1.4),
     )
     setup_fnn_models_and_train(
         params=params,
