@@ -186,6 +186,17 @@ class BatchNorm1dParameterExtractor(ParameterExtractor):
         ]
 
 
+class EmbeddingParameterExtractor(ParameterExtractor):
+    def __init__(self):
+        ParameterExtractor.__init__(self, nn.Embedding)
+
+    def _extract(self, module: nn.Embedding) -> list[ParameterDescription]:
+        return [
+            ParameterDescription("num_embeddings", "num_embeddings", module.num_embeddings),
+            ParameterDescription("embedding_dim", "embedding_dim", module.embedding_dim),
+        ]
+
+
 class ReLUParameterExtractor(ParameterExtractor):
     def __init__(self):
         ParameterExtractor.__init__(self, nn.ReLU)
