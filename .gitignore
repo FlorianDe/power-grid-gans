@@ -333,3 +333,5 @@ power-grid-gans/
 cached-data/
 
 /playground/pytorch/gan/misc/
+
+.VSCodeCounter
