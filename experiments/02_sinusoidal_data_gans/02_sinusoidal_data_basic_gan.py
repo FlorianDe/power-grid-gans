@@ -10,15 +10,10 @@ from matplotlib import pyplot as plt
 from statsmodels.distributions import ECDF
 from datetime import datetime
 
-from torch.optim.lr_scheduler import StepLR
-
-from experiments.utils import get_experiments_folder
+from experiments.experiments_utils.utils import get_experiments_folder
 from src.gan.discriminator.basic_discriminator import BasicDiscriminator
 from src.gan.generator.basic_generator import BasicGenerator
 from src.gan.trainer.vanilla_gan_trainer import VanillaGANTrainer
-from src.gan.discriminator.cnn_discriminator import CNNDiscriminator
-from src.gan.generator.cnn_generator import CNNGenerator
-from src.gan.trainer.cgan_trainer import CGANTrainer
 from src.plots.ecdf_plot import draw_ecdf_plot, ECDFPlotData
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
 from src.plots.violin_plot import draw_violin_plot

@@ -1,5 +1,5 @@
 from pathlib import PurePath
-from typing import Callable, Optional
+from typing import Optional
 from tqdm import tqdm
 import seaborn as sns
 
@@ -10,16 +10,29 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from torch import Size, Tensor
+from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
 
-from experiments.utils import get_experiments_folder, set_latex_plot_params
+from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
 
-from plotting import plot_model_losses, plot_train_data_overlayed, plot_box_plot_per_ts, plot_sample, save_fig
-from sine_data import SineGenerationParameters, generate_sine_features
+from experiments.experiments_utils.plotting import (
+    plot_model_losses,
+    plot_train_data_overlayed,
+    plot_box_plot_per_ts,
+    plot_sample,
+    save_fig,
+)
+from experiments.experiments_utils.sine_data import SineGenerationParameters, generate_sine_features
+from experiments.experiments_utils.train_typing import (
+    TrainParameters,
+    ConditionalTrainParameters,
+    BatchReshaper,
+    NoiseGenerator,
+)
+from experiments.experiments_utils.net_parsing import print_net_summary
+from experiments.experiments_utils.weight_init import init_weights
+
 from src.net.net_summary import LatexTableOptions, LatexTableStyle
-from train_typing import TrainParameters, ConditionalTrainParameters, BatchReshaper, NoiseGenerator
-from net_parsing import print_net_summary
 
 save_images_path = get_experiments_folder().joinpath("02_sinusoidal_data_gans").joinpath("02_02_conditional_gan_sines")
 save_images_path.mkdir(parents=True, exist_ok=True)
@@ -293,45 +306,6 @@ def train(
             save_fig(fig, loss_save_path / f"losses_after_{epoch}.{plots_file_ending}")
             plt.close(fig)
     print("End training\n--------------------------------------------")
-
-
-# # weight initialization
-# def init_weights(m: nn.Module):
-#     if type(m) == nn.Linear:
-#         nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain("relu"))
-#         # torch.nn.init.xavier_uniform(m.weight, gain=nn.init.calculate_gain("relu"))
-#         m.bias.data.fill_(0.01)
-
-
-def init_weights(net, init_type="normal", init_gain=0.02):
-    """Initialize network weights.
-    Parameters:
-        net (network)   -- network to be initialized
-        init_type (str) -- the name of an initialization method: normal | xavier | kaiming | orthogonal
-        init_gain (float)  -- scaling factor for normal, xavier and orthogonal.
-    """
-
-    def init_func(m):  # define the initialization function
-        classname = m.__class__.__name__
-        if hasattr(m, "weight") and (classname.find("Conv") != -1 or classname.find("Linear") != -1):
-            if init_type == "normal":
-                nn.init.normal_(m.weight.data, 0.0, init_gain)
-            elif init_type == "xavier":
-                nn.init.xavier_normal_(m.weight.data, gain=init_gain)
-            elif init_type == "kaiming":
-                nn.init.kaiming_normal_(m.weight.data, a=0, mode="fan_in")
-            elif init_type == "orthogonal":
-                nn.init.orthogonal_(m.weight.data, gain=init_gain)
-            else:
-                raise NotImplementedError("initialization method [%s] is not implemented" % init_type)
-            if hasattr(m, "bias") and m.bias is not None:
-                nn.init.constant_(m.bias.data, 0.01)
-        elif classname.find("BatchNorm1d") != -1:
-            nn.init.normal_(m.weight.data, 1.0, init_gain)
-            nn.init.constant_(m.bias.data, 0.0)
-
-    print("initialize network with %s" % init_type)
-    net.apply(init_func)
 
 
 def setup_fnn_models_and_train(

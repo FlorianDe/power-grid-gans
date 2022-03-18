@@ -7,8 +7,8 @@ import torch
 from matplotlib import pyplot as plt
 from torch import Tensor, nn
 
-from experiments.image_generation.utils import get_generated_images_path_folder
-from experiments.utils import set_latex_plot_params
+from utils import get_generated_images_path_folder
+from experiments.experiments_utils.utils import set_latex_plot_params
 
 from src.plots.typing import PlotOptions, PlotResult
 
@@ -34,7 +34,7 @@ class AddTicks:
 class ActivationConfig:
     fn: Callable[[Tensor], Tensor]
     eq: str
-    plot_options: Optional[PlotOptions] = PlotOptions(y_label=r'$\sigma(x)$')
+    plot_options: Optional[PlotOptions] = PlotOptions(y_label=r"$\sigma(x)$")
     add_ticks: Optional[AddTicks] = None
 
 
@@ -61,11 +61,11 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
     # plt.rcParams['grid.color']
-    ax.axhline(y=0, color='k', linewidth=plt.rcParams['grid.linewidth'])
-    ax.axvline(x=0, color='k', linewidth=plt.rcParams['grid.linewidth'])
+    ax.axhline(y=0, color="k", linewidth=plt.rcParams["grid.linewidth"])
+    ax.axvline(x=0, color="k", linewidth=plt.rcParams["grid.linewidth"])
     ax.plot(x, y, linewidth=linewidth_function)
     # ax.set_aspect('equal')
-    ax.grid(True, axis='y', linestyle='dashed')
+    ax.grid(True, axis="y", linestyle="dashed")
     # ax.grid(True, axis='x')
     # ax.grid(True, which='both')
     sns.despine(ax=ax, offset=0)
@@ -91,7 +91,9 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
     max_y = max(y)
     y_default_ticks = [-1, 0, 1]
     y_tick_values = [*y_default_ticks, max_y] if abs(1 - max_y) > 0.05 else [-1, 0, 1]
-    y_labels = y_tick_values.copy()[:-1] + [r"$\infty$"] if len(y_tick_values) > len(y_default_ticks) else y_default_ticks
+    y_labels = (
+        y_tick_values.copy()[:-1] + [r"$\infty$"] if len(y_tick_values) > len(y_default_ticks) else y_default_ticks
+    )
     if config.add_ticks is not None and config.add_ticks.y_ticks is not None:
         for add_tick in config.add_ticks.y_ticks:
             try:
@@ -107,7 +109,7 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
     ax.set_yticklabels([wrap_with_latex_makro(y_label) for y_label in y_labels], fontsize=tick_labels_fontsize)
 
     # Set the tick labels font
-    for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
         if isinstance(label, matplotlib.text.Text):
             if "infty" in label.get_text():
                 label.set_fontsize(f"{tick_label_non_numeric_fontsize}")
@@ -130,10 +132,10 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
         equation,
         xy=(0, 0),
         xytext=(0.25, 0.7),
-        textcoords='axes fraction',
-        horizontalalignment='center',
-        verticalalignment='center',
-        fontsize=equation_fontsize
+        textcoords="axes fraction",
+        horizontalalignment="center",
+        verticalalignment="center",
+        fontsize=equation_fontsize,
     )
     # ax.margins(-0.1, 0.1, tight=False)
 
@@ -149,7 +151,7 @@ def plot_activation_function(x_start: int, x_end: int, config: ActivationConfig)
     return PlotResult(fig, ax)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # sns.set_theme()
     # sns.set(style='ticks')
     # sns.axes_style("darkgrid")
@@ -172,56 +174,46 @@ if __name__ == '__main__':
         return torch.tensor([0 if e < 0 else 1 for e in x])
 
     activation_function_config: dict[str, ActivationConfig] = {
-        'BinaryStep': ActivationConfig(
+        "BinaryStep": ActivationConfig(
             fn=binary_step,
-            eq=r'$\displaystyle\sigma(x)=\begin{cases}1, &x \geq 0\\0, &x>0\end{cases}$',
-            add_ticks=AddTicks(
-                x_ticks=default_additional_x_ticks
-            )
+            eq=r"$\displaystyle\sigma(x)=\begin{cases}1, &x \geq 0\\0, &x>0\end{cases}$",
+            add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
-        'Sigmoid': ActivationConfig(
+        "Sigmoid": ActivationConfig(
             fn=torch.sigmoid,
-            eq=r'$\displaystyle\sigma(x)=\frac{1}{1+e^{-x}}$',
-            add_ticks=AddTicks(
-                x_ticks=default_additional_x_ticks
-            )
+            eq=r"$\displaystyle\sigma(x)=\frac{1}{1+e^{-x}}$",
+            add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
-        'TanH': ActivationConfig(
+        "TanH": ActivationConfig(
             fn=torch.tanh,
-            eq=r'$\displaystyle\sigma(x)=tanh(x)=\frac{2}{1+e^{-2x}}-1$',
-            add_ticks=AddTicks(
-                x_ticks=default_additional_x_ticks
-            )
+            eq=r"$\displaystyle\sigma(x)=tanh(x)=\frac{2}{1+e^{-2x}}-1$",
+            add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
-        'PReLU': ActivationConfig(
+        "PReLU": ActivationConfig(
             fn=nn.LeakyReLU(1 / 3),
-            eq=r'$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha*x, &x>0\end{cases}$',
-            plot_options=PlotOptions(y_label=r'$\sigma_{(\frac{1}{3})}(x)$'),
+            eq=r"$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha*x, &x>0\end{cases}$",
+            plot_options=PlotOptions(y_label=r"$\sigma_{(\frac{1}{3})}(x)$"),
             add_ticks=AddTicks(
                 x_ticks=default_additional_x_ticks,
                 y_ticks=[
                     Tick(x_min * (1 / 3), tex_neg_inf),
                 ],
-            )
+            ),
         ),
-        'ReLU': ActivationConfig(
+        "ReLU": ActivationConfig(
             fn=torch.relu,
-            eq=r'$\displaystyle\sigma(x)=\begin{cases}x, &x \geq 0\\0, &x<0\end{cases}$',
-            add_ticks=AddTicks(
-                x_ticks=default_additional_x_ticks
-            )
+            eq=r"$\displaystyle\sigma(x)=\begin{cases}x, &x \geq 0\\0, &x<0\end{cases}$",
+            add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
-        'ELU': ActivationConfig(
+        "ELU": ActivationConfig(
             fn=nn.ELU(1.0),
-            eq=r'$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha(e^{x}-1), &x < 0\end{cases}$',
-            plot_options=PlotOptions(y_label=r'$\sigma_{(1)}(x)$'),
-            add_ticks=AddTicks(
-                x_ticks=default_additional_x_ticks
-            )
+            eq=r"$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha(e^{x}-1), &x < 0\end{cases}$",
+            plot_options=PlotOptions(y_label=r"$\sigma_{(1)}(x)$"),
+            add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
     }
 
     for key, config in activation_function_config.items():
         fig, ax = plot_activation_function(x_min, x_max, config)
         fig.show()
-        fig.savefig(activation_functions / f"{key}.pdf", bbox_inches='tight', pad_inches=0)
+        fig.savefig(activation_functions / f"{key}.pdf", bbox_inches="tight", pad_inches=0)

@@ -10,7 +10,7 @@ from scipy.stats import distributions
 from statsmodels.distributions import ECDF
 from statsmodels.tsa.seasonal import STL
 
-from experiments.utils import set_latex_plot_params, get_experiments_folder
+from experiments.experiments_utils.utils import set_latex_plot_params, get_experiments_folder
 from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 from src.metrics.kullback_leibler import kl_divergence, __calculate_kl_divergence_terms
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData
@@ -46,10 +46,7 @@ def save_kl_divergence_example_plot() -> PlotResult:
     set_latex_plot_params()
 
     base = math.e
-    base_mappings = {
-        math.e: "nits",
-        2: "bits"
-    }
+    base_mappings = {math.e: "nits", 2: "bits"}
 
     np.random.seed(42)
     norm_mean_1, norm_std_1 = 0, 1
@@ -62,11 +59,25 @@ def save_kl_divergence_example_plot() -> PlotResult:
     P_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_1, scale=norm_std_1)
     Q_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_2, scale=norm_std_2)
 
-    fig, ((ax1, ax2, ax3)) = plt.subplots(ncols=3, nrows=1, figsize=(3 * 4.8, 4.8), sharey='all')
-    ax1.plot(sample_points, P_pdf,
-             label=r"$\displaystyle{P\sim" + normal_dist_str(norm_mean_1, norm_std_1) + r",\,\left\lvert P \right\rvert = " + str(n) + "}$")
-    ax1.plot(sample_points, Q_pdf,
-             label=r"$\displaystyle{Q\sim" + normal_dist_str(norm_mean_2, norm_std_2) + r",\,\left\lvert Q \right\rvert = " + str(n) + "}$")
+    fig, ((ax1, ax2, ax3)) = plt.subplots(ncols=3, nrows=1, figsize=(3 * 4.8, 4.8), sharey="all")
+    ax1.plot(
+        sample_points,
+        P_pdf,
+        label=r"$\displaystyle{P\sim"
+        + normal_dist_str(norm_mean_1, norm_std_1)
+        + r",\,\left\lvert P \right\rvert = "
+        + str(n)
+        + "}$",
+    )
+    ax1.plot(
+        sample_points,
+        Q_pdf,
+        label=r"$\displaystyle{Q\sim"
+        + normal_dist_str(norm_mean_2, norm_std_2)
+        + r",\,\left\lvert Q \right\rvert = "
+        + str(n)
+        + "}$",
+    )
     ax1.set_ylabel(r"Relative Häufigkeitsdichte $P(x)$")
     ax1.set_xlabel(r"$x$")
     ax1.legend(loc="best")
@@ -84,7 +95,16 @@ def save_kl_divergence_example_plot() -> PlotResult:
     ax3.set_xlabel(r"$x$")
 
     def create_KL_score_text(KL_fn_name: str, score: float) -> str:
-        return r"$\displaystyle{" + KL_fn_name + "=" + "{:.3f}".format(score) + r"\;\text{" + base_mappings[base] + "}" + "}$"
+        return (
+            r"$\displaystyle{"
+            + KL_fn_name
+            + "="
+            + "{:.3f}".format(score)
+            + r"\;\text{"
+            + base_mappings[base]
+            + "}"
+            + "}$"
+        )
 
     text_x_pos = min_x + (max_x - min_x) / 2
     text_y_pos_offset = 0.01
@@ -93,8 +113,8 @@ def save_kl_divergence_example_plot() -> PlotResult:
         x=text_x_pos,
         y=text_y_pos,
         s=create_KL_score_text(r"D_{\text{KL}_e}(P\,\Vert\,Q)", D_kl_pq),
-        horizontalalignment='center',
-        verticalalignment='bottom',
+        horizontalalignment="center",
+        verticalalignment="bottom",
         fontsize=text_fontsize,
     )
 
@@ -102,8 +122,8 @@ def save_kl_divergence_example_plot() -> PlotResult:
         x=text_x_pos,
         y=text_y_pos,
         s=create_KL_score_text(r"D_{\text{KL}_e}(Q\,\Vert\,P)", D_kl_qp),
-        horizontalalignment='center',
-        verticalalignment='bottom',
+        horizontalalignment="center",
+        verticalalignment="bottom",
         fontsize=text_fontsize,
     )
 
@@ -143,8 +163,8 @@ def save_ks_test_example_plot() -> PlotResult:
 
     data_all = sorted(np.concatenate([d1, d2]))
 
-    cdf1 = np.searchsorted(d1, data_all, side='right') / n
-    cdf2 = np.searchsorted(d2, data_all, side='right') / m
+    cdf1 = np.searchsorted(d1, data_all, side="right") / n
+    cdf2 = np.searchsorted(d2, data_all, side="right") / m
     max_s, idx = None, None
     for p in range(len(data_all)):
         diff = cdf1[p] - cdf2[p]
@@ -156,24 +176,33 @@ def save_ks_test_example_plot() -> PlotResult:
     y1 = cdf1[idx]
     y2 = cdf2[idx]
 
-    ax.step(d1, F1,
-            where="post",
-            label=r"$\displaystyle{F_{1,n}(x)}\;\text{für}\;X_{1}\sim" + normal_dist_str(norm_mean_1, norm_std_1) + r",\,n=\left\lvert X_{1} \right\rvert = " + str(n) + "$")
-    ax.step(d2, F2,
-            where="post",
-            label=r"$\displaystyle{F_{2,m}(x)}\;\text{für}\;X_{2}\sim" + unif_dist_str(unif_start, unif_end) + r",\,m=\left\lvert X_{2} \right\rvert = " + str(m) + "$"
-            )
-    ax.annotate("",
-                xy=(x, y1),
-                xytext=(x, y2),
-                arrowprops=dict(arrowstyle="<->", color="k")
-                )
+    ax.step(
+        d1,
+        F1,
+        where="post",
+        label=r"$\displaystyle{F_{1,n}(x)}\;\text{für}\;X_{1}\sim"
+        + normal_dist_str(norm_mean_1, norm_std_1)
+        + r",\,n=\left\lvert X_{1} \right\rvert = "
+        + str(n)
+        + "$",
+    )
+    ax.step(
+        d2,
+        F2,
+        where="post",
+        label=r"$\displaystyle{F_{2,m}(x)}\;\text{für}\;X_{2}\sim"
+        + unif_dist_str(unif_start, unif_end)
+        + r",\,m=\left\lvert X_{2} \right\rvert = "
+        + str(m)
+        + "$",
+    )
+    ax.annotate("", xy=(x, y1), xytext=(x, y2), arrowprops=dict(arrowstyle="<->", color="k"))
     ax.text(
         x=x + KS_MAX_TEXT_HORIZONTAL_MARGIN,
         y=(min(y1, y2) + abs(y2 - y1) * KS_MAX_TEXT_PLACING_FACTOR),
         s=r"$\displaystyle{D_{n,m}=" + "{:.2f}".format(max_s) + "}$",
-        horizontalalignment='left',
-        verticalalignment='center',
+        horizontalalignment="left",
+        verticalalignment="center",
         fontsize=text_fontsize,
     )
     ax.legend(loc="best")
@@ -190,9 +219,9 @@ def save_ks_test_example_plot() -> PlotResult:
 def save_timeseries_plot() -> PlotResult:
     np.random.seed(0)
     n = 365 * 4
-    dates = np.array('2022-01-01', dtype=np.datetime64) + np.arange(n)
+    dates = np.array("2022-01-01", dtype=np.datetime64) + np.arange(n)
     data = 20 * np.sin(2 * np.pi * np.arange(n) / 365) + np.random.normal(5, 2, n)
-    df = pd.DataFrame({'data': data}, index=dates)
+    df = pd.DataFrame({"data": data}, index=dates)
 
     decomp_result = STL(df, period=365).fit()
 
@@ -203,11 +232,7 @@ def save_timeseries_plot() -> PlotResult:
         DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
         DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
     }
-    res = draw_timeseries_plot(
-        data=decomp_result,
-        translations=translations,
-        figsize=(6.4, 6.4)
-    )
+    res = draw_timeseries_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
 
     return res
 
@@ -225,14 +250,21 @@ def save_qq_plot_defaults() -> list[NamedPlotResult]:
     for line in [
         QQReferenceLine.THEORETICAL_LINE,
         QQReferenceLine.FIRST_THIRD_QUARTIL,
-        QQReferenceLine.LEAST_SQUARES_REGRESSION
+        QQReferenceLine.LEAST_SQUARES_REGRESSION,
     ]:
         qq_res = draw_qq_plot(
-            PlotData(data=d1, label=r'$\displaystyle{\text{Stichprobe} \sim ' + unif_dist_str(unif_start, unif_end) + '}$'),
-            PlotData(data=d2, label=r"$\displaystyle{\text{Theoretische Verteilung} \sim " + normal_dist_str(norm_mean, norm_std) + "}$"),
+            PlotData(
+                data=d1, label=r"$\displaystyle{\text{Stichprobe} \sim " + unif_dist_str(unif_start, unif_end) + "}$"
+            ),
+            PlotData(
+                data=d2,
+                label=r"$\displaystyle{\text{Theoretische Verteilung} \sim "
+                + normal_dist_str(norm_mean, norm_std)
+                + "}$",
+            ),
             5000,
             {line},
-            [0.25, 0.5, 0.75]
+            [0.25, 0.5, 0.75],
         )
         results.append(NamedPlotResult(line.name, qq_res))
 
@@ -249,15 +281,23 @@ def save_qq_plot_norm_vs_norm() -> PlotResult:
     d_test = np.random.normal(norm_mean_test, norm_std_test, n)
 
     qq_res = draw_qq_plot(
-        PlotData(data=d_test, label=r'$\displaystyle{\text{Stichprobe} \sim ' + normal_dist_str(norm_mean_test, norm_std_test) + '}$'),
-        PlotData(data=d_theo, label=r"$\displaystyle{\text{Theoretische Verteilung} \sim " + normal_dist_str(norm_mean_theo, norm_std_theo) + "}$"),
+        PlotData(
+            data=d_test,
+            label=r"$\displaystyle{\text{Stichprobe} \sim " + normal_dist_str(norm_mean_test, norm_std_test) + "}$",
+        ),
+        PlotData(
+            data=d_theo,
+            label=r"$\displaystyle{\text{Theoretische Verteilung} \sim "
+            + normal_dist_str(norm_mean_theo, norm_std_theo)
+            + "}$",
+        ),
         5000,
         {
             QQReferenceLine.THEORETICAL_LINE,
             # QQReferenceLine.FIRST_THIRD_QUARTIL,
             # QQReferenceLine.LEAST_SQUARES_REGRESSION
         },
-        [0.25, 0.5, 0.75]
+        [0.25, 0.5, 0.75],
     )
 
     return qq_res
@@ -266,16 +306,23 @@ def save_qq_plot_norm_vs_norm() -> PlotResult:
 def save_histogram(normalized: bool = False) -> PlotResult:
     np.random.seed(42)
     n = 5000
-    params = [
-        (-0.5, 0.3, n, "A"),
-        (0, 0.3, 1000, "B"),
-        (0.5, 0.2, 2000, "C")
-    ]
+    params = [(-0.5, 0.3, n, "A"), (0, 0.3, 1000, "B"), (0.5, 0.2, 2000, "C")]
     pds = [
         HistPlotData(
             data=np.random.normal(p[0], p[1], p[2]),
-            label=r"$" + str(p[3]) + r"\sim \mathcal{N}(" + str(p[0]) + r"," + str(p[1]) + r"), \left\lvert " + str(p[3]) + r"\right\rvert =" + str(p[2]) + r"$"
-        ) for p in params
+            label=r"$"
+            + str(p[3])
+            + r"\sim \mathcal{N}("
+            + str(p[0])
+            + r","
+            + str(p[1])
+            + r"), \left\lvert "
+            + str(p[3])
+            + r"\right\rvert ="
+            + str(p[2])
+            + r"$",
+        )
+        for p in params
     ]
     mean, var = distributions.norm.fit(pds[2].data)
     print(mean, var)
@@ -287,10 +334,9 @@ def save_histogram(normalized: bool = False) -> PlotResult:
         bin_width=bin_width,
         normalized=normalized,
         plot_options=PlotOptions(
-            x_label="$x$",
-            y_label="Relative Häufigkeitsdichte" if normalized else "Absolute Häufigkeit"
+            x_label="$x$", y_label="Relative Häufigkeitsdichte" if normalized else "Absolute Häufigkeit"
         ),
-        plot=PlotResult(fig, ax)
+        plot=PlotResult(fig, ax),
     )
     return PlotResult(fig, ax)
 
@@ -316,8 +362,8 @@ def save_box_vs_violinplot() -> PlotResult:
     whisker_high = q3 + (q3 - q1) * 1.5
     (ax1, ax2) = gs.subplots()  # plt.subplots(nrows=1, ncols=2, figsize=(10, 6), sharex='row')
     fig.subplots_adjust(wspace=0)
-    sns.boxplot(y=data, color='CornflowerBlue', ax=ax1)
-    sns.violinplot(y=data, color='CornflowerBlue', ax=ax2)
+    sns.boxplot(y=data, color="CornflowerBlue", ax=ax1)
+    sns.violinplot(y=data, color="CornflowerBlue", ax=ax2)
     # Outlier plotting from https://stackoverflow.com/a/66920981/11133168
     # outliers = data[(data > whisker_high) | (data < whisker_low)]
     # sns.scatterplot(y=outliers, x=0, marker='D', color='crimson', ax=ax2)
@@ -343,13 +389,23 @@ def save_box_vs_violinplot() -> PlotResult:
             y=y_cord,
             s=text,
             fontsize=text_fontsize,
-            horizontalalignment='center',
-            verticalalignment='center',
+            horizontalalignment="center",
+            verticalalignment="center",
             transform=ax1.transAxes,
         )
         text_offset = 0.035 * len(text)
-        ax1.annotate("", xy=(x_poses[0], y_pos), xytext=(x_max - text_offset, y_pos), arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR))
-        ax2.annotate("", xy=(x_poses[1], y_pos), xytext=(-x_max + text_offset, y_pos), arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR))
+        ax1.annotate(
+            "",
+            xy=(x_poses[0], y_pos),
+            xytext=(x_max - text_offset, y_pos),
+            arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR),
+        )
+        ax2.annotate(
+            "",
+            xy=(x_poses[1], y_pos),
+            xytext=(-x_max + text_offset, y_pos),
+            arrowprops=dict(arrowstyle="->", color=DEFAULT_ARROW_COLOR),
+        )
 
     draw_desc("Ausreißer", whisker_high + 4, (0.05, -0.02))
     draw_desc("oberer Whisker", whisker_high - 1.8, (0.2, -0.02))
@@ -378,7 +434,7 @@ def save_box_vs_violinplot() -> PlotResult:
     return PlotResult(fig, ax1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sns.set_theme()
     sns.set_context("paper")
     set_latex_plot_params()
@@ -390,32 +446,38 @@ if __name__ == '__main__':
 
     violin_plot_res = save_box_vs_violinplot()
     violin_plot_res.fig.show()
-    violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches='tight', pad_inches=0)
+    violin_plot_res.fig.savefig(metrics_folder / f"boxplot_vs_violin_plot.pdf", bbox_inches="tight", pad_inches=0)
 
     histogram_res_default = save_histogram()
     histogram_res_default.fig.show()
-    histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches='tight', pad_inches=0)
+    histogram_res_default.fig.savefig(metrics_folder / f"histogram_default.pdf", bbox_inches="tight", pad_inches=0)
 
     histogram_res_normed = save_histogram(True)
     histogram_res_normed.fig.show()
-    histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches='tight', pad_inches=0)
+    histogram_res_normed.fig.savefig(metrics_folder / f"histogram_normed.pdf", bbox_inches="tight", pad_inches=0)
 
     qq_plot_defaults_res = save_qq_plot_defaults()
     for res in qq_plot_defaults_res:
         res.plot.show()
-        res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches='tight', pad_inches=0)
+        res.plot.fig.savefig(metrics_folder / f"qq_plot_default_{res.name}.pdf", bbox_inches="tight", pad_inches=0)
     qq_plot_norm = save_qq_plot_norm_vs_norm()
     qq_plot_norm.show()
-    qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches='tight', pad_inches=0)
+    qq_plot_norm.fig.savefig(metrics_folder / f"qq_plot_norm_vs_norm.pdf", bbox_inches="tight", pad_inches=0)
 
     timeseries_decomposition_res = save_timeseries_plot()
     timeseries_decomposition_res.fig.show()
-    timeseries_decomposition_res.fig.savefig(metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches='tight', pad_inches=0)
+    timeseries_decomposition_res.fig.savefig(
+        metrics_folder / f"timeseries_decomposition_sine_years.pdf", bbox_inches="tight", pad_inches=0
+    )
 
     ks_test_example_plot_res = save_ks_test_example_plot()
     ks_test_example_plot_res.fig.show()
-    ks_test_example_plot_res.fig.savefig(metrics_folder / f"ks_test_example_plot.pdf", bbox_inches='tight', pad_inches=0)
+    ks_test_example_plot_res.fig.savefig(
+        metrics_folder / f"ks_test_example_plot.pdf", bbox_inches="tight", pad_inches=0
+    )
 
     kl_divergence_example_res = save_kl_divergence_example_plot()
     kl_divergence_example_res.fig.show()
-    kl_divergence_example_res.fig.savefig(metrics_folder / f"kl_divergence_example_plot.pdf", bbox_inches='tight', pad_inches=0)
+    kl_divergence_example_res.fig.savefig(
+        metrics_folder / f"kl_divergence_example_plot.pdf", bbox_inches="tight", pad_inches=0
+    )

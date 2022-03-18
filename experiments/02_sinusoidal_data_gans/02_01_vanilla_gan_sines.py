@@ -1,4 +1,3 @@
-from string import Template
 from pathlib import PurePath
 from typing import Optional
 from tqdm import tqdm
@@ -13,8 +12,8 @@ import torch.optim as optim
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from experiments.utils import get_experiments_folder, set_latex_plot_params
-from plotting import (
+from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
+from experiments.experiments_utils.plotting import (
     plot_model_losses,
     plot_train_data_overlayed,
     plot_box_plot_per_ts,
@@ -22,9 +21,9 @@ from plotting import (
     save_fig,
 )
 from src.net.net_summary import LatexTableOptions, LatexTableStyle
-from train_typing import TrainParameters, AdamParameters, BatchReshaper, NoiseGenerator
-from sine_data import SineGenerationParameters, generate_sine_features
-from net_parsing import print_net_summary
+from experiments.experiments_utils.train_typing import TrainParameters, AdamParameters, BatchReshaper, NoiseGenerator
+from experiments.experiments_utils.sine_data import SineGenerationParameters, generate_sine_features
+from experiments.experiments_utils.net_parsing import print_net_summary
 
 save_images_path = get_experiments_folder().joinpath("02_sinusoidal_data_gans").joinpath("02_01_vanilla_gan_fnn_sines")
 save_images_path.mkdir(parents=True, exist_ok=True)
