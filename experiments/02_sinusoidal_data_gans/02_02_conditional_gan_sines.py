@@ -21,9 +21,7 @@ from src.net.net_summary import LatexTableOptions, LatexTableStyle
 from train_typing import TrainParameters, ConditionalTrainParameters, BatchReshaper, NoiseGenerator
 from net_parsing import print_net_summary
 
-save_images_path = (
-    get_experiments_folder().joinpath("02_sinusoidal_data_basic_gan").joinpath("02_02_conditional_gan_sines")
-)
+save_images_path = get_experiments_folder().joinpath("02_sinusoidal_data_gans").joinpath("02_02_conditional_gan_sines")
 save_images_path.mkdir(parents=True, exist_ok=True)
 
 

@@ -42,15 +42,15 @@ from src.utils.pandas_utils import get_datetime_values
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     warnings.warn("Have been overhauled by 02_01_vanila_gan_sines.py", DeprecationWarning, stacklevel=2)
     sns.set_theme()
     sns.set_context("paper")
-    sinusoidal_dists_root_folder = get_experiments_folder().joinpath("02_sinusoidal_data_basic")
-    experiment_folder_name = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    sinusoidal_dists_root_folder = get_experiments_folder().joinpath("02_sinusoidal_data_gans")
+    experiment_folder_name = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     experiment_folder = sinusoidal_dists_root_folder / experiment_folder_name
     experiment_folder.mkdir(parents=True, exist_ok=True)
     plot_extension = ".pdf"
@@ -59,11 +59,11 @@ if __name__ == '__main__':
     epochs = 1000
     noise_vector_size = 1
     sequence_length = 24
-    samples_len = sequence_length*7
+    samples_len = sequence_length * 7
     batch_size = 5
     features = 1
-    start_date: str = '2020.01.01'
-    end_date: str = '2020.01.01'
+    start_date: str = "2020.01.01"
+    end_date: str = "2020.01.01"
 
     samples = generate_sinusoidal_time_series(
         sample_count=1,
@@ -72,27 +72,31 @@ if __name__ == '__main__':
         seed=SEED,
         func=np.sin,
         normalize=False,
-        trig_parameters=TrigFuncParameters(2*math.pi/24, 0, 1)
+        trig_parameters=TrigFuncParameters(2 * math.pi / 24, 0, 1),
     )
     input_data = samples[0].astype(np.float32)
     feature_labels = [Feature("Sin value") for i in range(features)]
-    dates = pd.date_range(start='01/01/2021', freq="h", periods=samples_len)
+    dates = pd.date_range(start="01/01/2021", freq="h", periods=samples_len)
     data_holder = DataHolder(
         data=np.array(list(chunks(input_data, sequence_length))),
         data_labels=feature_labels,
-        dates=np.array(list(chunks(np.array(dates_to_conditional_vectors(*get_datetime_values(dates))), sequence_length)))
+        dates=np.array(
+            list(chunks(np.array(dates_to_conditional_vectors(*get_datetime_values(dates))), sequence_length))
+        ),
     )
 
     # G_net = CNNGenerator(input_size=noise_vector_size, out_size=features)
-    G_net = BasicGenerator(input_size=noise_vector_size, out_size=sequence_length * features, hidden_layers=[256, 512, 1024, 512])
+    G_net = BasicGenerator(
+        input_size=noise_vector_size, out_size=sequence_length * features, hidden_layers=[256, 512, 1024, 512]
+    )
     G_optim = torch.optim.Adam(G_net.parameters(), lr=1e-2, betas=(0.9, 0.999))
-    G_sched = None # StepLR(G_optim, step_size=30, gamma=0.1)
+    G_sched = None  # StepLR(G_optim, step_size=30, gamma=0.1)
     G = TrainModel(G_net, G_optim, G_sched)
 
     # D_net = CNNDiscriminator(input_size=features, out_size=1)
     D_net = BasicDiscriminator(input_size=sequence_length * features, out_size=1, hidden_layers=[1024, 512, 256])
     D_optim = torch.optim.Adam(D_net.parameters(), lr=1e-2, betas=(0.9, 0.999))
-    D_sched = None # StepLR(D_optim, step_size=30, gamma=0.1)
+    D_sched = None  # StepLR(D_optim, step_size=30, gamma=0.1)
     D = TrainModel(D_net, D_optim, D_sched)
 
     # summary(G_net, (features, noise_vector_size))
@@ -105,7 +109,7 @@ if __name__ == '__main__':
         noise_vector_size=noise_vector_size,
         sequence_length=sequence_length,
         batch_size=batch_size,
-        device='cpu'
+        device="cpu",
     )
     gan_trainer.train(epochs)
 
@@ -181,13 +185,13 @@ if __name__ == '__main__':
         ### Visualizations and plots
         # PCA and T-SNE PLOTS
         try:
-            res_pca = visualization(input_data, gen_data, 'pca')
+            res_pca = visualization(input_data, gen_data, "pca")
             res_pca.show()
         except Exception as e:
             print(f"Error PCA: {e}")
 
         try:
-            res_tsne = visualization(input_data, gen_data, 'tsne')
+            res_tsne = visualization(input_data, gen_data, "tsne")
             res_tsne.show()
         except Exception as e:
             print(f"Error TSNE: {e}")
@@ -196,55 +200,63 @@ if __name__ == '__main__':
         box_plot_inputs = [PlotData(input_data, "Original Data"), PlotData(gen_data, "Generated Data")]
         try:
             box_plot_res = draw_box_plot(box_plot_inputs)
-            box_plot_res.fig.savefig(experiment_folder/f"box_plot{plot_extension}")
+            box_plot_res.fig.savefig(experiment_folder / f"box_plot{plot_extension}")
             box_plot_res.show()
         except Exception as e:
             print(f"Error BoxPlot: {e}")
 
         try:
             violin_plot_res = draw_violin_plot(box_plot_inputs)
-            violin_plot_res.fig.savefig(experiment_folder/f"violin_plot{plot_extension}")
+            violin_plot_res.fig.savefig(experiment_folder / f"violin_plot{plot_extension}")
             violin_plot_res.show()
         except Exception as e:
             print(f"Error Violin Plot: {e}")
 
         # Draw Histogram
-        hist_plot_res = draw_hist_plot([
-            HistPlotData(data=input_data, label='Orig'),
-            HistPlotData(data=gen_data, label='Generated'),
-        ],
-            bin_width=0.05
+        hist_plot_res = draw_hist_plot(
+            [
+                HistPlotData(data=input_data, label="Orig"),
+                HistPlotData(data=gen_data, label="Generated"),
+            ],
+            bin_width=0.05,
         )
-        hist_plot_res.fig.savefig(experiment_folder/f"histogram_plot{plot_extension}")
+        hist_plot_res.fig.savefig(experiment_folder / f"histogram_plot{plot_extension}")
         hist_plot_res.show()
 
         # Draw ECDF Plot
-        ecdf_plot_res = draw_ecdf_plot([
-            ECDFPlotData(
-                data=ECDF(input_data),
-                label="Orig data",
-                confidence_band_alpha=0.05,
-                confidence_band_fill_alpha=0.3,
-                confidence_band_label_supplier=lambda alpha: f"{alpha}% confidence band"
-            ),
-            ECDFPlotData(data=ECDF(gen_data), label="Generated data", confidence_band_alpha=0.00, confidence_band_fill_alpha=0.3),
-        ])
-        ecdf_plot_res.fig.savefig(experiment_folder/f"ecdf_plot{plot_extension}")
+        ecdf_plot_res = draw_ecdf_plot(
+            [
+                ECDFPlotData(
+                    data=ECDF(input_data),
+                    label="Orig data",
+                    confidence_band_alpha=0.05,
+                    confidence_band_fill_alpha=0.3,
+                    confidence_band_label_supplier=lambda alpha: f"{alpha}% confidence band",
+                ),
+                ECDFPlotData(
+                    data=ECDF(gen_data),
+                    label="Generated data",
+                    confidence_band_alpha=0.00,
+                    confidence_band_fill_alpha=0.3,
+                ),
+            ]
+        )
+        ecdf_plot_res.fig.savefig(experiment_folder / f"ecdf_plot{plot_extension}")
         ecdf_plot_res.show()
 
         # Draw QQ Plot
         qq_plot_res = draw_qq_plot(
-            PlotData(data=input_data, label='Real Values'),
-            PlotData(data=gen_data, label='Theoretical quantiles'),
+            PlotData(data=input_data, label="Real Values"),
+            PlotData(data=gen_data, label="Theoretical quantiles"),
             50,
             {
                 # QQReferenceLine.THEORETICAL_LINE,
                 QQReferenceLine.FIRST_THIRD_QUARTIL,
-                QQReferenceLine.LEAST_SQUARES_REGRESSION
+                QQReferenceLine.LEAST_SQUARES_REGRESSION,
             },
-            [0.25, 0.5, 0.75]
+            [0.25, 0.5, 0.75],
         )
-        qq_plot_res.fig.savefig(experiment_folder/f"qq_plot{plot_extension}")
+        qq_plot_res.fig.savefig(experiment_folder / f"qq_plot{plot_extension}")
         qq_plot_res.fig.show()
 
     # plot_dfs([data])
@@ -253,7 +265,7 @@ if __name__ == '__main__':
         fig, ax = plt.subplots(nrows=1, ncols=1)
         ax.plot(generated_data_first_batch[feature_idx])
         ax.plot(samples[feature_idx])
-        fig.savefig(experiment_folder/f"comparison_{feature_idx}{plot_extension}")
+        fig.savefig(experiment_folder / f"comparison_{feature_idx}{plot_extension}")
         fig.show()
 
     # for sample_idx in range(len(samples)):
@@ -263,5 +275,3 @@ if __name__ == '__main__':
     #         ax.plot(feature_series[feature_idx])
     #         fig.show()
     # print(samples)
-
-
