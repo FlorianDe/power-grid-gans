@@ -334,7 +334,9 @@ def setup_fnn_models_and_train(
         out_features=1,
         dropout=dropout,
     )
-    init_weights(D, "xavier", init_gain=nn.init.calculate_gain("relu"))
+    # init_weights(G, "xavier", init_gain=nn.init.calculate_gain("relu"))
+    # init_weights(D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
+
     train(
         G=G,
         D=D,

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Union
+from typing import Callable
 import torch
 
 

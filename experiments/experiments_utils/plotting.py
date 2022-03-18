@@ -14,8 +14,8 @@ from torch import Tensor
 
 from src.plots.typing import Locale
 
-from sine_data import SineGenerationParameters
-from train_typing import TrainParameters
+from experiments.experiments_utils.sine_data import SineGenerationParameters
+from experiments.experiments_utils.train_typing import TrainParameters
 
 PLOT_LANG = Locale.DE
 

@@ -11,15 +11,16 @@ from src.utils.type_utils import check_list_type
 
 
 class DataHolder:
-    def __init__(self,
-                 data: npt.ArrayLike,
-                 data_labels: Optional[Union[list[Feature], list[str]]] = None,
-                 dates: Optional[npt.ArrayLike] = None,
-                 normalizer_constructor: Optional[type(BaseNormalizer)] = None
-                 ) -> None:
+    def __init__(
+        self,
+        data: npt.ArrayLike,
+        data_labels: Optional[Union[list[Feature], list[str]]] = None,
+        dates: Optional[npt.ArrayLike] = None,
+        normalizer_constructor: Optional[type[BaseNormalizer]] = None,
+    ) -> None:
         super().__init__()
         if data is None:
-            raise AssertionError('Cannot create an instance without a valid data set.')
+            raise AssertionError("Cannot create an instance without a valid data set.")
 
         data_feature_size = data.shape[-1]
         if data_labels is None:
@@ -28,12 +29,18 @@ class DataHolder:
             data_labels = [Feature(label, label) for label in data_labels]
 
         if not check_list_type(data_labels, Feature):
-            raise ValueError(f"You have passed in some kind of mixed type feature labels array which is not suitable, {data_labels=}.")
+            raise ValueError(
+                f"You have passed in some kind of mixed type feature labels array which is not suitable, {data_labels=}."
+            )
         if data_feature_size != len(data_labels):
-            raise ValueError(f"The feature labels for the data do not match in size. {data_feature_size=} and {data_labels=}")
+            raise ValueError(
+                f"The feature labels for the data do not match in size. {data_feature_size=} and {data_labels=}"
+            )
 
         if dates is not None and len(dates) != len(data):
-            raise ValueError("If you are passing corresponding time values x, they have to be of the same length as the passed data")
+            raise ValueError(
+                "If you are passing corresponding time values x, they have to be of the same length as the passed data"
+            )
 
         if dates is None:
             dates = np.fromiter(range(len(data)), dtype="float32")
@@ -56,7 +63,9 @@ class DataHolder:
         return self.data_labels
 
     @staticmethod
-    def create_dataset_sampler(dataset: TensorDataset, validation_split: float = .8, shuffle_dataset: bool = False, random_seed: int = 42):
+    def create_dataset_sampler(
+        dataset: TensorDataset, validation_split: float = 0.8, shuffle_dataset: bool = False, random_seed: int = 42
+    ):
         # Creating samplers for training and validation splits:
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
