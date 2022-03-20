@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 
@@ -43,7 +43,7 @@ def save_fig(fig, path):
 
 
 def plot_sample(
-    sample: Tensor, params: TrainParameters, plot: tuple[Figure, Axes], condition: Optional[int] = None
+    sample: Tensor, params: TrainParameters, plot: tuple[Figure, Axes], condition: Optional[Union[int, str]] = None
 ) -> tuple[Figure, Axes]:
     sample = sample.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
     fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1)
