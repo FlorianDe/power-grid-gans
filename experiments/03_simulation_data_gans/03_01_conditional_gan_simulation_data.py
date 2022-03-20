@@ -1,5 +1,6 @@
 from pathlib import PurePath
 from typing import Optional
+import numpy as np
 from tqdm import tqdm
 import seaborn as sns
 
@@ -12,6 +13,8 @@ import torch.optim as optim
 
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
+
+from statsmodels.tsa.seasonal import STL
 
 from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
 
@@ -30,8 +33,23 @@ from experiments.experiments_utils.train_typing import (
     NoiseGenerator,
 )
 from experiments.experiments_utils.net_parsing import print_net_summary
+from experiments.experiments_utils.weight_init import init_weights
+from src.data.data_holder import DataHolder
+from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
+from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
+from src.data.typing import Feature
+from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter
 
 from src.net.net_summary import LatexTableOptions, LatexTableStyle
+from src.plots.histogram_plot import HistPlotData, draw_hist_plot
+from src.plots.timeseries_plot import DecomposeResultColumns, draw_timeseries_plot
+from src.utils.datetime_utils import (
+    PANDAS_DEFAULT_DATETIME_FORMAT,
+    convert_input_str_to_date,
+    dates_to_conditional_vectors,
+    get_day_in_year_from_date,
+    interval_generator,
+)
 
 save_images_path = (
     get_experiments_folder().joinpath("03_simulation_data_gans").joinpath("03_01_conditional_gan_simulation_data")
@@ -126,17 +144,17 @@ class GeneratorFNN(nn.Module):
         embedded_conditions = self.embedding(condition)
         x = torch.cat((x, embedded_conditions), dim=1)
         x = self.fnn(x)
-        x = self.tanh(x)
+        # x = self.tanh(x)
         return x
         # return self.fnn(x) # removed tanh
 
 
 def train(
+    data_holder: DataHolder,
     G: nn.Module,
     D: nn.Module,
     batch_reshaper: BatchReshaper,
     noise_generator: NoiseGenerator,
-    samples_parameters: list[SineGenerationParameters],
     params: TrainParameters,
     features_len: int,
     save_path: PurePath,
@@ -148,14 +166,23 @@ def train(
     # Beta1 hyperparam for Adam optimizers
     beta1 = 0.9
 
-    criterion = nn.BCELoss()
+    criterion = nn.BCELoss()  # nn.BCEWithLogitsLoss()
 
+    # optimizerD = optim.RMSprop(D.parameters(), lr=1e-2, alpha=0.99, eps=1e-8, weight_decay=0, momentum=0)
+    # optimizerG = optim.RMSprop(G.parameters(), lr=1e-2, alpha=0.99, eps=1e-8, weight_decay=0, momentum=0)
     optimizerD = optim.Adam(D.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
 
-    # generate sample data
-    samples = [generate_sine_features(params) for params in samples_parameters]
-    conditions = [torch.squeeze(torch.full((params.times, 1), idx)) for idx, params in enumerate(samples_parameters)]
+    # reshape data
+    print(f"{data_holder.data.shape=}")
+    data = torch.from_numpy(data_holder.data).view(-1, 24, data_holder.get_feature_size())
+    samples = [data]
+    data_conditions = torch.from_numpy(data_holder.conditions).view(-1, 24)[
+        ..., 0
+    ]  # torch.from_numpy(np.array([idx % 366 for idx in range(data.size(0))])) #NOT CORRECT for multiple years etc
+    conditions = [data_conditions]
+    print(f"{data.shape=}")
+    print(f"{data_conditions.shape=}")
 
     # create train test directory
     save_path.mkdir(parents=True, exist_ok=True)
@@ -166,13 +193,14 @@ def train(
     sample_save_path = save_path / "sample"
     sample_save_path.mkdir(parents=True, exist_ok=True)
 
-    fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
-    save_fig(fig, save_path / f"train_data_plot.{plots_file_ending}")
+    # TODO CREATE PLOTS
+    # fig, _ = plot_train_data_overlayed(samples, samples_parameters, params)
+    # save_fig(fig, save_path / f"train_data_plot.{plots_file_ending}")
 
     print(f"Preparing training data for: {save_path.name}")
-    print(f"Start training with samples:")
-    for i, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
-        print(f"{i}. sample {sample.shape} with params: {sample_params} and condition: {i}")
+    # print(f"Start training with samples:")
+    # for i, (sample, sample_params) in enumerate(zip(samples, samples_parameters)):
+    #     print(f"{i}. sample {sample.shape} with params: {sample_params} and condition: {i}")
     flattened_samples = torch.concat(samples, dim=0)  # TODO FOR NOW JUST CONCAT THEM!
     flattened_conditions = torch.concat(conditions, dim=0)  # TODO FOR NOW JUST CONCAT THEM!
 
@@ -214,14 +242,16 @@ def train(
         for batch_idx, (data_batch, conditions_batch) in enumerate(dataloader):
             current_batch_size = min(params.batch_size, data_batch.shape[0])
             data_batch = batch_reshaper(data_batch, current_batch_size, params.sequence_len, features_len)
+            # ADD NOISE
+            data_batch = data_batch + 0.01 * torch.randn(data_batch.shape, device=params.device)
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
-            # real_labels = torch.ones(current_batch_size, requires_grad=False, device=params.device)  # try with 0.9
-            real_labels = torch.squeeze(
-                torch.full((current_batch_size, 1), 0.9, requires_grad=False, device=params.device)
-            )
+            real_labels = torch.ones(current_batch_size, requires_grad=False, device=params.device)  # try with 0.9
+            # real_labels = torch.squeeze(
+            #     torch.full((current_batch_size, 1), 0.9, requires_grad=False, device=params.device)
+            # )
             fake_labels = torch.zeros(current_batch_size, requires_grad=False, device=params.device)
 
             ## Train with all-real batch
@@ -256,7 +286,7 @@ def train(
             D_G_z2 = d_out_fake.mean().item()
             optimizerG.step()
 
-            if iters % 20 == 0:
+            if iters % 100 == 0:
                 # padded_epoch = str(epoch).ljust(len(str(params.epochs)))
                 # padded_batch_idx = str(batch_idx).ljust(len(str(len(dataloader))))
                 progress_str = "Loss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f" % (
@@ -274,34 +304,88 @@ def train(
 
             iters += 1
 
-        if epoch % 10 == 0:
-            for cond_idx, sample in enumerate(samples):
-                with torch.no_grad():
-                    generated_sample_count = 7
-                    batch_noise = noise_generator(generated_sample_count, params, features_len)
-                    batch_conditions = torch.squeeze(torch.full((generated_sample_count, 1), cond_idx))
-                    generated_sine = G(batch_noise, batch_conditions)
-                    generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 3))
-                    fig, ax = plot_sample(sample=generated_sine, params=params, plot=(fig, ax), condition=cond_idx)
-                    save_fig(fig, sample_save_path / f"{epoch}_cond_{cond_idx}.{plots_file_ending}")
+        if (epoch == 1) or (epoch % 50 == 0):
+            # cond_idx = 128
+            with torch.no_grad():
+                # start_date: str = "2009.01.01"
+                # end_date: str = "2109.12.31"
+                # start = convert_input_str_to_date(start_date)
+                # end = convert_input_str_to_date(end_date)
+                # batch_conditions = torch.from_numpy(
+                #     np.array([get_day_in_year_from_date(d) for d in interval_generator(start, end)])
+                # )
+                times = 100
+                batch_conditions = torch.from_numpy(
+                    np.tile(np.concatenate((np.tile(np.arange(365), 3), np.arange(366))), times)
+                )
+                generated_sample_count = batch_conditions.size(0)
+                batch_noise = noise_generator(generated_sample_count, params, features_len)
+                # print(f"{batch_noise.shape=}")
+                # print(f"{batch_conditions.shape=}")
+                generated_data = G(batch_noise, batch_conditions)
+                generated_data = generated_data.view(generated_sample_count, params.sequence_len, features_len)
+                if data_holder.normalizer is not None:
+                    generated_data = data_holder.normalizer.renormalize(generated_data)
+                generated_data = generated_data.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
+                # fig, ax = plt.subplots(nrows=1, ncols=1)
+                generated_data_seperated = torch.unbind(generated_data)
+                # flattened_sample = torch.concat(unbind_sample)
+                for feature_idx, (feature_data, feature_label) in enumerate(
+                    zip(generated_data_seperated, data_holder.get_feature_labels())
+                ):
+                    label_str = feature_label.label if isinstance(feature_label, Feature) else feature_label
+                    label_str = label_str.replace("_", r"\_")
+                    # res = draw_hist_plot([HistPlotData(data=feature_data.view(-1).numpy(), label=label_str)])
+                    fig, ax = plt.subplots(nrows=1, ncols=1)
+                    ax.hist(feature_data.view(-1).numpy(), label=label_str, density=False)
 
-                with torch.no_grad():
-                    generated_sample_count = 100
-                    batch_noise = noise_generator(generated_sample_count, params, features_len)
-                    batch_conditions = torch.squeeze(torch.full((generated_sample_count, 1), cond_idx))
-                    generated_sine = G(batch_noise, batch_conditions)
-                    generated_sine = generated_sine.view(generated_sample_count, params.sequence_len, features_len)
-                    for feature_idx, (fig, ax) in enumerate(
-                        plot_box_plot_per_ts(
-                            data=generated_sine, epoch=epoch, samples=[sample], params=params, condition=cond_idx
-                        )
-                    ):
-                        save_fig(
-                            fig,
-                            distributions_save_path
-                            / f"distribution_epoch_{epoch}_cond_{cond_idx}_feature_{feature_idx}.{plots_file_ending}",
-                        )
+                    save_fig(
+                        fig,
+                        distributions_save_path
+                        / f"distribution_hist_epoch_{epoch}_cond_ALL_feature_{feature_idx}.{plots_file_ending}",
+                    )
+            with torch.no_grad():
+                start_date: str = "2009.01.01"
+                end_date: str = "2009.12.31"
+                start = convert_input_str_to_date(start_date)
+                end = convert_input_str_to_date(end_date)
+                batch_conditions = torch.from_numpy(
+                    np.array([get_day_in_year_from_date(d) for d in interval_generator(start, end)])
+                )
+                generated_sample_count = batch_conditions.size(0)
+                batch_noise = noise_generator(generated_sample_count, params, features_len)
+                generated_data = G(batch_noise, batch_conditions)
+                generated_data = generated_data.view(generated_sample_count, params.sequence_len, features_len)
+                if data_holder.normalizer is not None:
+                    generated_data = data_holder.normalizer.renormalize(generated_data)
+                fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
+                fig, ax = plot_sample(sample=generated_data, params=params, plot=(fig, ax), condition="ALL")
+                save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{plots_file_ending}")
+
+                for i, y in enumerate(torch.transpose(flattened_sample, 0, 1)):
+                    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
+                    x = range(len(y))
+                    ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
+                    save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{plots_file_ending}")
+
+            # with torch.no_grad():
+            #     generated_sample_count = 100
+            #     batch_noise = noise_generator(generated_sample_count, params, features_len)
+            #     batch_conditions = torch.squeeze(torch.full((generated_sample_count, 1), cond_idx))
+            #     generated_data = G(batch_noise, batch_conditions)
+            #     generated_data = generated_data.view(generated_sample_count, params.sequence_len, features_len)
+            #     if data_holder.normalizer is not None:
+            #         generated_data = data_holder.normalizer.renormalize(generated_data)
+            #     for feature_idx, (fig, ax) in enumerate(
+            #         plot_box_plot_per_ts(
+            #             data=generated_data, epoch=epoch, samples=samples, params=params, condition=cond_idx
+            #         )
+            #     ):
+            #         save_fig(
+            #             fig,
+            #             distributions_save_path
+            #             / f"distribution_epoch_{epoch}_cond_{cond_idx}_feature_{feature_idx}.{plots_file_ending}",
+            #         )
 
             fig, ax = plot_model_losses(g_losses=G_losses, d_losses=D_losses, current_epoch=epoch)
             save_fig(fig, loss_save_path / f"losses_after_{epoch}.{plots_file_ending}")
@@ -310,14 +394,15 @@ def train(
 
 
 def setup_fnn_models_and_train(
+    data_holder: DataHolder,
     params: ConditionalTrainParameters,
-    samples_parameters: list[SineGenerationParameters],
-    features_len: int,
     save_path: PurePath,
     latex_options: Optional[LatexTableOptions],
     dropout: float = 0.5,
 ):
-    conditions = len(samples_parameters)
+    conditions = 366  #
+    features_len = data_holder.get_feature_size()
+
     G = GeneratorFNN(
         latent_vector_size=params.latent_vector_size,
         features=features_len,
@@ -335,13 +420,16 @@ def setup_fnn_models_and_train(
         out_features=1,
         dropout=dropout,
     )
-    init_weights(D, "xavier", init_gain=nn.init.calculate_gain("relu"))
+
+    # init_weights(G, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
+    # init_weights(D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
+
     train(
+        data_holder=data_holder,
         G=G,
         D=D,
         batch_reshaper=fnn_batch_reshaper,
         noise_generator=fnn_noise_generator,
-        samples_parameters=samples_parameters,
         params=params,
         features_len=features_len,
         save_path=save_path,
@@ -350,51 +438,19 @@ def setup_fnn_models_and_train(
     return D, G
 
 
-def train_fnn_multiple_sample_univariate(params: TrainParameters, sample_batches: int):
-    """
-    Baseline for conditional GAN with FNN
-    """
-    features_len = 1
-    samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.95], times=sample_batches, noise_scale=0.01
-        ),
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.25], times=sample_batches, noise_scale=0.01
-        ),
-    ]
-    setup_fnn_models_and_train(
-        params=params,
-        samples_parameters=samples_parameters,
-        features_len=features_len,
-        save_path=save_images_path / "fnn_multiple_sample_univariate",
-        latex_options=None,
-    )
-
-
-def train_fnn_multiple_sample_multivariate(params: TrainParameters, sample_batches: int):
+def train_all_features(data_holder: DataHolder, params: TrainParameters):
     """
     Multivariate for conditional GAN with FNN
     """
-    features_len = 2
-    samples_parameters: list[SineGenerationParameters] = [
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.95, 0.5], times=sample_batches, noise_scale=0.01
-        ),
-        SineGenerationParameters(
-            sequence_len=params.sequence_len, amplitudes=[0.5, 0.2], times=sample_batches, noise_scale=0.01
-        ),
-    ]
     latex_options = LatexTableOptions(
-        caption="Conditional GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für multivariate sinusoidale Daten",
-        label="conditional_gan_fnn_sines_net_multiple_multivariate_{net_type}",
-        style=LatexTableStyle(scaleWithAdjustbox=1.4),
+        caption="Conditional GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für Simulationsdaten",
+        label="conditional_gan_fnn_sines_net_simulation_data_{net_type}",
+        # style=LatexTableStyle(scaleWithAdjustbox=1.0),
     )
     setup_fnn_models_and_train(
+        data_holder=data_holder,
         params=params,
-        samples_parameters=samples_parameters,
-        features_len=features_len,
-        save_path=save_images_path / "fnn_multiple_sample_multivariate",
+        save_path=save_images_path / "fnn_all_features",
         latex_options=latex_options,
     )
 
@@ -404,19 +460,46 @@ def main():
     sns.set_context("paper")
     # sns.set_palette("colorblind")
     set_latex_plot_params()
-
     manualSeed = 1337
     print("Random Seed: ", manualSeed)
     random.seed(manualSeed)
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
+    start_date_str = DEFAULT_DATA_START_DATE
+    end_date_str = "2010-12-31 23:00:00"  # "2019-12-31 23:00:00"
+    start_date = convert_input_str_to_date(start_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
+    end_date = convert_input_str_to_date(end_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
+    data_importer = DWDWeatherDataImporter(start_date=start_date_str, end_date=end_date_str)
+    data_importer.initialize()
+    # conditions = np.array([get_day_in_year_from_date(d) for d in interval_generator(start_date, end_date)])
+    data_holder = DataHolder(
+        data=data_importer.data.values.astype(np.float32),
+        data_labels=data_importer.get_feature_labels(),
+        dates=np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
+        conditions=np.array(data_importer.get_day_of_year_values()),
+        normalizer_constructor=StandardNumpyNormalizer,
+    )
 
-    train_params = ConditionalTrainParameters(batch_size=16, epochs=4000, embedding_dim=32)
-    sample_batches = train_params.batch_size * 128
+    train_data_save_path = save_images_path / "train_data"
+    train_data_save_path.mkdir(parents=True, exist_ok=True)
+    for (column_name, values_normalized) in zip(data_importer.data, data_holder.data):
+        decomp_result = STL(data_importer.data[column_name], period=365).fit()
+        decomp_result2 = STL(values_normalized, period=365).fit()
+        translations = {
+            DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
+            DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
+            DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
+            DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
+            DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
+        }
+        res = draw_timeseries_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
+        save_fig(res.fig, train_data_save_path / f"data_{column_name}.pdf")
+        res2 = draw_timeseries_plot(data=decomp_result2, translations=translations, figsize=(6.4, 6.4))
+        save_fig(res2.fig, train_data_save_path / f"data_normed_{column_name}.pdf")
 
-    # FNN trainings
-    # train_fnn_multiple_sample_univariate(train_params, sample_batches)
-    train_fnn_multiple_sample_multivariate(train_params, sample_batches)
+    train_params = ConditionalTrainParameters(batch_size=64, epochs=4000, embedding_dim=32)
+
+    train_all_features(data_holder=data_holder, params=train_params)
 
 
 if __name__ == "__main__":
