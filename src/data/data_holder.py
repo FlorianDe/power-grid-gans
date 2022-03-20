@@ -16,6 +16,7 @@ class DataHolder:
         data: npt.ArrayLike,
         data_labels: Optional[Union[list[Feature], list[str]]] = None,
         dates: Optional[npt.ArrayLike] = None,
+        conditions: Optional[npt.ArrayLike] = None,
         normalizer_constructor: Optional[type[BaseNormalizer]] = None,
     ) -> None:
         super().__init__()
@@ -42,6 +43,11 @@ class DataHolder:
                 "If you are passing corresponding time values x, they have to be of the same length as the passed data"
             )
 
+        if conditions is not None and len(conditions) != len(data):
+            raise ValueError(
+                f"If you are passing conditions, they have to be of the same length as the passed data. {data.shape=}, {conditions.shape=}"
+            )
+
         if dates is None:
             dates = np.fromiter(range(len(data)), dtype="float32")
 
@@ -51,6 +57,7 @@ class DataHolder:
         self.normalizer.fit(data)
         self.data = self.normalizer.normalize(data)
         self.data_labels = data_labels
+        self.conditions = conditions
         self.x = dates  # TODO Maybe transform it here already
 
     def get_tensor_dataset(self) -> TensorDataset:
