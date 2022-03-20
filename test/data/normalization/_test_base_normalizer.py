@@ -7,10 +7,16 @@ from src.data.normalization.base_normalizer import BaseNormalizer
 
 
 def _test_is_fitted_helper(tester: unittest.TestCase, normalizer: BaseNormalizer, expected: bool):
-    tester.assertEqual(normalizer.is_fitted(), expected, "Normalizer should be fitted." if expected else "Normalizer shouldn't be fitted yet.")
+    tester.assertEqual(
+        normalizer.is_fitted(),
+        expected,
+        "Normalizer should be fitted." if expected else "Normalizer shouldn't be fitted yet.",
+    )
 
 
-def _test_serialization_helper(tester: unittest.TestCase, normalizer: BaseNormalizer, data: numpy.array) -> BaseNormalizer:
+def _test_serialization_helper(
+    tester: unittest.TestCase, normalizer: BaseNormalizer, data: numpy.array
+) -> BaseNormalizer:
     normalizer.fit(data)
     _test_is_fitted_helper(tester, normalizer, True)
     normalized_data = normalizer.normalize(data)
