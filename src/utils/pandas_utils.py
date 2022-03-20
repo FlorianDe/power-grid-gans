@@ -15,5 +15,18 @@ def get_datetime_values(data: Union[Series, DataFrame, DatetimeIndex]) -> tuple[
     if not isinstance(data, DatetimeIndex):
         index = data.index
     if not isinstance(index, DatetimeIndex):
-        raise ValueError("The index of the importer is no DatetimeIndex therefore it is not enforced to have a month, day and hour column!")
+        raise ValueError(
+            "The index of the importer is no DatetimeIndex therefore it is not enforced to have a month, day and hour column!"
+        )
     return index.month.values, index.day.values, index.hour.values
+
+
+def get_day_of_year_values(data: Union[Series, DataFrame, DatetimeIndex]) -> nd.ndarray:
+    index = data
+    if not isinstance(data, DatetimeIndex):
+        index = data.index
+    if not isinstance(index, DatetimeIndex):
+        raise ValueError(
+            "The index of the importer is no DatetimeIndex therefore it is not enforced to have a day_of_year column!"
+        )
+    return index.day_of_year
