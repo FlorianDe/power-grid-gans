@@ -176,7 +176,7 @@ if __name__ == "__main__":
     activation_function_config: dict[str, ActivationConfig] = {
         "BinaryStep": ActivationConfig(
             fn=binary_step,
-            eq=r"$\displaystyle\sigma(x)=\begin{cases}1, &x \geq 0\\0, &x>0\end{cases}$",
+            eq=r"$\displaystyle\sigma(x)=\begin{cases}1, &x \geq 0\\0, &x<0\end{cases}$",
             add_ticks=AddTicks(x_ticks=default_additional_x_ticks),
         ),
         "Sigmoid": ActivationConfig(
