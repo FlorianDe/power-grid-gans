@@ -13,7 +13,7 @@ from src.data.weather.weather_filters import clip_to_zero
 from src.utils.path_utils import unzip, get_root_project_path
 from src.utils.plot_utils import plot_dfs
 from src.utils.python_ext import FinalClass
-from src.utils.pandas_utils import get_datetime_values
+from src.utils.pandas_utils import get_datetime_values, get_day_of_year_values
 
 # Base code from: https://gitlab.com/midas-mosaik/midas/-/blob/main/src/midas/tools/weather_data.py
 #
@@ -33,20 +33,20 @@ DATE_TIME_FORMAT = "%Y%m%d%H"
 JOULE_TO_WATT = 10 / 3.6
 DATE_COL = 1
 DATE_COL_SOL = 8
-DEFAULT_DATA_CACHE_FOLDER = 'cached-data'
+DEFAULT_DATA_CACHE_FOLDER = "cached-data"
 DEFAULT_DWD_WEATHER_DATA_PATH = "weather/dwd"
 DEFAULT_DATA_START_DATE = "2009-01-01 00:00:00"
 DEFAULT_DATA_END_DATE = "2019-12-31 23:00:00"
 BASE_URL = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly/"
-PRODUKT_FILE_NAME_BEGINNING = 'produkt'
+PRODUKT_FILE_NAME_BEGINNING = "produkt"
 
 
 class WeatherDimension(Enum):
-    AIR = 'AIR'
-    SOLAR = 'SOLAR'
-    WIND = 'WIND'
-    SUN = 'SUN'
-    CLOUD = 'CLOUD'
+    AIR = "AIR"
+    SOLAR = "SOLAR"
+    WIND = "WIND"
+    SUN = "SUN"
+    CLOUD = "CLOUD"
 
 
 @dataclass
@@ -68,7 +68,7 @@ class ColumnMapping:
 class WeatherDataSet:
     fileUrlPath: str
     columns: List[ColumnMapping]
-    fileSuffix: str = '.zip'
+    fileSuffix: str = ".zip"
     dateTimeParser: Callable[[str], datetime] = lambda date: datetime.strptime(date, DATE_TIME_FORMAT)
 
 
@@ -98,23 +98,23 @@ WEATHER_DATA_MAPPING: dict[WeatherDimension, WeatherDataSet] = {
                 #     )
                 # ]
             )
-        ]
+        ],
     ),
     WeatherDimension.SOLAR: WeatherDataSet(
         fileUrlPath="solar/stundenwerte_ST_00691_row",
         dateTimeParser=lambda date: datetime.strptime(date.split(":")[0], "%Y%m%d%H"),
         columns=[
             ColumnMapping("FD_LBERG", WeatherDataColumns.DH_W_PER_M2, JOULE_TO_WATT, dataPreprocessing=clip_to_zero),
-            ColumnMapping("FG_LBERG", WeatherDataColumns.GH_W_PER_M2, JOULE_TO_WATT, dataPreprocessing=clip_to_zero)
-        ]
+            ColumnMapping("FG_LBERG", WeatherDataColumns.GH_W_PER_M2, JOULE_TO_WATT, dataPreprocessing=clip_to_zero),
+        ],
     ),
-    WeatherDimension.WIND: WeatherDataSet(
-        fileUrlPath="wind/historical/stundenwerte_FF_00691_19260101_20201231_hist",
-        columns=[
-            ColumnMapping("   F", WeatherDataColumns.WIND_V_M_PER_S, dataPreprocessing=clip_to_zero),
-            ColumnMapping("   D", WeatherDataColumns.WIND_DIR_DEGREE, 1, dataPreprocessing=clip_to_zero)  # TODO CREATE RELATIVIZATION FIRST
-        ]
-    ),
+    # WeatherDimension.WIND: WeatherDataSet(
+    #     fileUrlPath="wind/historical/stundenwerte_FF_00691_19260101_20201231_hist",
+    #     columns=[
+    #         ColumnMapping("   F", WeatherDataColumns.WIND_V_M_PER_S, dataPreprocessing=clip_to_zero),
+    #         ColumnMapping("   D", WeatherDataColumns.WIND_DIR_DEGREE, 1, dataPreprocessing=clip_to_zero)  # TODO CREATE RELATIVIZATION FIRST
+    #     ]
+    # ),
     # Length mismatch
     # WeatherDimension.CLOUD: WeatherDataSet(
     #     fileUrlPath="cloudiness/historical/stundenwerte_N_00691_19490101_20201231",
@@ -133,15 +133,14 @@ WEATHER_DATA_MAPPING: dict[WeatherDimension, WeatherDataSet] = {
 
 class DWDWeatherDataImporter:
     def __init__(
-            self,
-            start_date: str = DEFAULT_DATA_START_DATE,
-            end_date: str = DEFAULT_DATA_END_DATE,
-            path: Optional[str] = None
+        self,
+        start_date: str = DEFAULT_DATA_START_DATE,
+        end_date: str = DEFAULT_DATA_END_DATE,
+        path: Optional[str] = None,
     ):
         if path is None:
             root = get_root_project_path()
-            self.path = str(
-                root.joinpath(DEFAULT_DATA_CACHE_FOLDER).joinpath(DEFAULT_DWD_WEATHER_DATA_PATH).absolute())
+            self.path = str(root.joinpath(DEFAULT_DATA_CACHE_FOLDER).joinpath(DEFAULT_DWD_WEATHER_DATA_PATH).absolute())
         else:
             self.path = path
         self.start_date = start_date
@@ -162,7 +161,7 @@ class DWDWeatherDataImporter:
         self.__preprocess()
 
     def __load(self):
-        print(f'Loading and transforming data:')
+        print(f"Loading and transforming data:")
         for dimension in WEATHER_DATA_MAPPING.keys():
             self.__load_data_dimension(dimension)
 
@@ -202,13 +201,13 @@ class DWDWeatherDataImporter:
         os.makedirs(self.path, exist_ok=True)
 
         for weatherDimension, weatherSource in WEATHER_DATA_MAPPING.items():
-            file_download_url = f'{BASE_URL}/{weatherSource.fileUrlPath}{weatherSource.fileSuffix}'
+            file_download_url = f"{BASE_URL}/{weatherSource.fileUrlPath}{weatherSource.fileSuffix}"
             weather_source_file_name = file_download_url.rsplit("/", 1)[-1]
             if not os.path.exists(os.path.join(self.path, weather_source_file_name)):
                 weather_source_file_name = wget.download(file_download_url, out=self.path)
-                print(f'Downloaded {file_download_url}')
+                print(f"Downloaded {file_download_url}")
                 unzip(self.path, weather_source_file_name, weatherDimension.value.lower())
-                print(f'Unzipped {weather_source_file_name}')
+                print(f"Unzipped {weather_source_file_name}")
 
     def __load_data_dimension(self, target: WeatherDimension) -> None:
         target_dimension_name = target.value.lower()
@@ -221,14 +220,19 @@ class DWDWeatherDataImporter:
         csv = pd.read_csv(
             target_data_file, sep=";", index_col=1, parse_dates=[1], date_parser=weather_data_set.dateTimeParser
         )
-        csv = csv.loc[self.start_date:self.end_date]
+        csv = csv.loc[self.start_date : self.end_date]
 
         for column in weather_data_set.columns:
-            print(f'{column.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')
+            print(f"{column.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}")
             self._assign_column_data(column.targetColumn, csv[column.sourceColumn].values * column.unitFactor)
             for extraMapping in column.extraMappings:
-                print(f'--> calculated data: tar_mean_col: {extraMapping.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}')
-                self._assign_column_data(extraMapping.targetColumn, extraMapping.calculate(csv[column.sourceColumn].values, column.unitFactor))
+                print(
+                    f"--> calculated data: tar_mean_col: {extraMapping.targetColumn}, src_col: {column.sourceColumn}, fac: {column.unitFactor}"
+                )
+                self._assign_column_data(
+                    extraMapping.targetColumn,
+                    extraMapping.calculate(csv[column.sourceColumn].values, column.unitFactor),
+                )
 
     def _assign_column_data(self, target_column, values):
         self.data[target_column] = values
@@ -236,6 +240,9 @@ class DWDWeatherDataImporter:
 
     def get_datetime_values(self) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
         return get_datetime_values(self.data)
+
+    def get_day_of_year_values(self) -> numpy.ndarray:
+        return get_day_of_year_values(self.data)
 
     def get_feature_labels(self):
         return self.__data_labels
