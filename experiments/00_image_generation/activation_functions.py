@@ -191,7 +191,7 @@ if __name__ == "__main__":
         ),
         "PReLU": ActivationConfig(
             fn=nn.LeakyReLU(1 / 3),
-            eq=r"$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha*x, &x>0\end{cases}$",
+            eq=r"$\displaystyle\sigma_{\alpha}(x)=\begin{cases}x, &x \geq 0\\ \alpha \cdot x, &x>0\end{cases}$",
             plot_options=PlotOptions(y_label=r"$\sigma_{(\frac{1}{3})}(x)$"),
             add_ticks=AddTicks(
                 x_ticks=default_additional_x_ticks,
