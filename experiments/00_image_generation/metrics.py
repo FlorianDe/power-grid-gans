@@ -82,13 +82,13 @@ def save_kl_divergence_example_plot() -> PlotResult:
     ax1.set_xlabel(r"$x$")
     ax1.legend(loc="best")
 
-    D_kl_points_pq = __calculate_kl_divergence_terms(P_pdf, Q_pdf, base)
+    D_kl_points_pq = list(__calculate_kl_divergence_terms(P_pdf, Q_pdf, base))
     D_kl_pq = kl_divergence(P_pdf, Q_pdf, base)
     ax2.plot(sample_points, D_kl_points_pq)
     ax2.fill_between(x=sample_points, y1=D_kl_points_pq, alpha=DEFAULT_ALPHA)
     ax2.set_xlabel(r"$x$")
 
-    D_kl_points_qp = __calculate_kl_divergence_terms(Q_pdf, P_pdf, base)
+    D_kl_points_qp = list(__calculate_kl_divergence_terms(Q_pdf, P_pdf, base))
     D_kl_qp = kl_divergence(Q_pdf, P_pdf, base)
     ax3.plot(sample_points, D_kl_points_qp)
     ax3.fill_between(x=sample_points, y1=D_kl_points_qp, alpha=DEFAULT_ALPHA)
