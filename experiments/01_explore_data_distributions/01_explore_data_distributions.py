@@ -137,8 +137,18 @@ def explore_data_distributions(options: DistributionFitOptions):
         ],
         WeatherDataColumns.WIND_DIR_DEGREE: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Windrichtung in Grad $(0^{\circ} - 359^{\circ})$"),
+                plot_options=PlotOptions(x_label=r"Windrichtung in Grad $[0^{\circ}, 350^{\circ}]$"),
                 extra_dist_plots=["uniform", "random"],
+                bins=36,  # Since 360 degree and only in steps*10
+                legend_spacing=True,
+            )
+        ],
+        WeatherDataColumns.WIND_DIR_DEGREE_DELTA: [
+            DistributionPlotColumn(
+                plot_options=PlotOptions(
+                    x_label=r"Windrichtungsänderung in Grad pro Stunde $[-180^{\circ}, 180^{\circ}]$"
+                ),
+                extra_dist_plots=["norm"],
                 bins=36,  # Since 360 degree and only in steps*10
                 legend_spacing=True,
             )
@@ -154,14 +164,19 @@ def explore_data_distributions(options: DistributionFitOptions):
             )
         ],
     }
-    used_target_columns = [
-        col_map.targetColumn for nested in WEATHER_DATA_MAPPING.values() for col_map in nested.columns
+    extra_mappings_target_columns = [
+        extra_column.targetColumn
+        for nested in WEATHER_DATA_MAPPING.values()
+        for col_map in nested.columns
+        for extra_column in col_map.extraMappings
     ]
+    target_columns = [col_map.targetColumn for nested in WEATHER_DATA_MAPPING.values() for col_map in nested.columns]
+    used_target_columns = extra_mappings_target_columns + target_columns
 
     data_info = [
         (column, target_column_extra_info[column])
         for column in used_target_columns
-        if target_column_extra_info[column] is not None
+        if column in target_column_extra_info
     ]
 
     for target_column, column_plot_metadata_entries in data_info:
