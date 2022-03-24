@@ -84,7 +84,9 @@ def explore_data_distributions(options: DistributionFitOptions):
     sns.set_theme()
     sns.set_context("paper")
     set_latex_plot_params()
-    explore_dists_root_folder = get_experiments_folder().joinpath("01_explore_data_distributions")
+    explore_dists_root_folder = (
+        get_experiments_folder().joinpath("01_explore_weather_data").joinpath("01_explore_data_distributions")
+    )
     start_date = DEFAULT_DATA_START_DATE
     end_date = "2019-12-31 23:00:00"
 
