@@ -151,7 +151,7 @@ class DWDWeatherDataImporter:
         start_date: str = DEFAULT_DATA_START_DATE,
         end_date: str = DEFAULT_DATA_END_DATE,
         auto_preprocess=True,
-        dimensions: Optional[set[WeatherDimension]] = None,
+        dimensions: Optional[set[WeatherDataColumns]] = None,
         path: Optional[str] = None,
     ):
         if dimensions is None:
@@ -269,6 +269,12 @@ class DWDWeatherDataImporter:
 
     def get_feature_labels(self):
         return self.__data_labels
+
+    def get_data_subset(self, columns: Optional[set[WeatherDataColumns]] = None) -> DataFrame:
+        if columns is None or len(columns) == 0:
+            raise ValueError("You have to specify at least one column to retrieve a real subset!")
+
+        return self.data[list(columns)]
 
 
 if __name__ == "__main__":
