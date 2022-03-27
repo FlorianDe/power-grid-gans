@@ -14,18 +14,13 @@ import torch.optim as optim
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
 
-from statsmodels.tsa.seasonal import STL
-
 from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
 
 from experiments.experiments_utils.plotting import (
     plot_model_losses,
-    plot_train_data_overlayed,
-    plot_box_plot_per_ts,
     plot_sample,
     save_fig,
 )
-from experiments.experiments_utils.sine_data import SineGenerationParameters, generate_sine_features
 from experiments.experiments_utils.train_typing import (
     TrainParameters,
     ConditionalTrainParameters,
@@ -33,18 +28,16 @@ from experiments.experiments_utils.train_typing import (
     NoiseGenerator,
 )
 from experiments.experiments_utils.net_parsing import print_net_summary
-from experiments.experiments_utils.weight_init import init_weights
 from src.data.data_holder import DataHolder
-from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
 from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
 from src.data.typing import Feature
-from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 
-from src.net.net_summary import LatexTableOptions, LatexTableStyle
+from src.net.net_summary import LatexTableOptions
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
-from src.plots.timeseries_plot import DecomposeResultColumns, draw_timeseries_plot
+from src.plots.typing import PlotData, PlotOptions
+from src.plots.violin_plot import draw_violin_plot
 from src.utils.datetime_utils import (
-    PANDAS_DEFAULT_DATETIME_FORMAT,
     convert_input_str_to_date,
     dates_to_conditional_vectors,
     get_day_in_year_from_date,
@@ -94,7 +87,10 @@ class DiscriminatorFNN(nn.Module):
         self.fnn = nn.Sequential(
             *dense_block(input_size + embeddings, 2 * input_size, False),
             *dense_block(2 * input_size, 4 * input_size),
-            # *dense_block(4 * input_size, 4 * input_size),
+            *dense_block(4 * input_size, 8 * input_size),
+            # *dense_block(8 * input_size, 16 * input_size),
+            # *dense_block(16 * input_size, 8 * input_size),
+            *dense_block(8 * input_size, 4 * input_size),
             nn.Linear(4 * input_size, out_features),
         )
         self.sigmoid = nn.Sigmoid()
@@ -135,7 +131,10 @@ class GeneratorFNN(nn.Module):
         self.fnn = nn.Sequential(
             *dense_block(latent_vector_size + embeddings, 2 * latent_vector_size),
             *dense_block(2 * latent_vector_size, 4 * latent_vector_size),
-            # *dense_block(4 * latent_vector_size, 4 * latent_vector_size),
+            *dense_block(4 * latent_vector_size, 8 * latent_vector_size),
+            # *dense_block(8 * latent_vector_size, 16 * latent_vector_size),
+            # *dense_block(16 * latent_vector_size, 8 * latent_vector_size),
+            *dense_block(8 * latent_vector_size, 4 * latent_vector_size),
             nn.Linear(4 * latent_vector_size, features * sequence_len),
         )
         self.tanh = nn.Tanh()
@@ -165,13 +164,14 @@ def train(
     lr = 1e-3
     # Beta1 hyperparam for Adam optimizers
     beta1 = 0.9
+    beta2 = 0.99
 
     criterion = nn.BCELoss()  # nn.BCEWithLogitsLoss()
 
     # optimizerD = optim.RMSprop(D.parameters(), lr=1e-2, alpha=0.99, eps=1e-8, weight_decay=0, momentum=0)
     # optimizerG = optim.RMSprop(G.parameters(), lr=1e-2, alpha=0.99, eps=1e-8, weight_decay=0, momentum=0)
-    optimizerD = optim.Adam(D.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(D.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerG = optim.Adam(G.parameters(), lr=lr, betas=(beta1, beta2))
 
     # reshape data
     print(f"{data_holder.data.shape=}")
@@ -180,6 +180,7 @@ def train(
     data_conditions = torch.from_numpy(data_holder.conditions).view(-1, 24)[
         ..., 0
     ]  # torch.from_numpy(np.array([idx % 366 for idx in range(data.size(0))])) #NOT CORRECT for multiple years etc
+    print(data_conditions[data_conditions == 0])
     conditions = [data_conditions]
     print(f"{data.shape=}")
     print(f"{data_conditions.shape=}")
@@ -304,7 +305,7 @@ def train(
 
             iters += 1
 
-        if (epoch == 1) or (epoch % 50 == 0):
+        if (epoch == 1) or (epoch % 10 == 0):
             # cond_idx = 128
             with torch.no_grad():
                 # start_date: str = "2009.01.01"
@@ -328,30 +329,46 @@ def train(
                     generated_data = data_holder.normalizer.renormalize(generated_data)
                 generated_data = generated_data.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
                 # fig, ax = plt.subplots(nrows=1, ncols=1)
-                generated_data_seperated = torch.unbind(generated_data)
+                # generated_data_seperated = torch.unbind(generated_data)
+                generated_data_seperated = generated_data.view(
+                    features_len, generated_sample_count, params.sequence_len
+                )
                 # flattened_sample = torch.concat(unbind_sample)
                 for feature_idx, (feature_data, feature_label) in enumerate(
                     zip(generated_data_seperated, data_holder.get_feature_labels())
                 ):
                     label_str = feature_label.label if isinstance(feature_label, Feature) else feature_label
                     label_str = label_str.replace("_", r"\_")
-                    # res = draw_hist_plot([HistPlotData(data=feature_data.view(-1).numpy(), label=label_str)])
-                    fig, ax = plt.subplots(nrows=1, ncols=1)
-                    ax.hist(feature_data.view(-1).numpy(), label=label_str, density=False)
+                    # res = draw_hist_plot(
+                    #     pds=[HistPlotData(data=feature_data.view(-1).numpy(), label=label_str)],
+                    #     # bin_width=0.5,
+                    #     # normalized=True,
+                    # )
+
+                    # fig, ax = plt.subplots(nrows=1, ncols=1)
+                    # ax.hist(feature_data.view(-1).numpy(), label=label_str, density=False)
+                    data = PlotData(data=feature_data.view(-1).numpy(), label=label_str)
+                    res = draw_violin_plot(
+                        [data], PlotOptions(title="Violin plot opt", x_label=r"X\_lbl", y_label=r"Y\_lbl")
+                    )
 
                     save_fig(
-                        fig,
+                        res.fig,
                         distributions_save_path
                         / f"distribution_hist_epoch_{epoch}_cond_ALL_feature_{feature_idx}.{plots_file_ending}",
                     )
             with torch.no_grad():
-                start_date: str = "2009.01.01"
-                end_date: str = "2009.12.31"
-                start = convert_input_str_to_date(start_date)
-                end = convert_input_str_to_date(end_date)
-                batch_conditions = torch.from_numpy(
-                    np.array([get_day_in_year_from_date(d) for d in interval_generator(start, end)])
+                winter_start = convert_input_str_to_date("2009.01.01")
+                winter_end = convert_input_str_to_date("2009.01.08")
+                summer_start = convert_input_str_to_date("2009.08.01")
+                summer_end = convert_input_str_to_date("2009.08.08")
+                winter_batch_conditions = torch.from_numpy(
+                    np.array([get_day_in_year_from_date(d) for d in interval_generator(winter_start, winter_end)])
                 )
+                summer_batch_conditions = torch.from_numpy(
+                    np.array([get_day_in_year_from_date(d) for d in interval_generator(summer_start, summer_end)])
+                )
+                batch_conditions = torch.cat((winter_batch_conditions, summer_batch_conditions), 0)
                 generated_sample_count = batch_conditions.size(0)
                 batch_noise = noise_generator(generated_sample_count, params, features_len)
                 generated_data = G(batch_noise, batch_conditions)
@@ -359,14 +376,17 @@ def train(
                 if data_holder.normalizer is not None:
                     generated_data = data_holder.normalizer.renormalize(generated_data)
                 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
-                fig, ax = plot_sample(sample=generated_data, params=params, plot=(fig, ax), condition="ALL")
-                save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{plots_file_ending}")
+                for idx, (fig, ax) in enumerate(
+                    plot_sample(sample=generated_data, params=params, plot=(fig, ax), condition="ALL")
+                ):
+                    save_fig(fig, sample_save_path / f"{epoch}_feat_{idx}_cond_ALL.{plots_file_ending}")
 
-                for i, y in enumerate(torch.transpose(flattened_sample, 0, 1)):
-                    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
-                    x = range(len(y))
-                    ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
-                    save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{plots_file_ending}")
+                # TODO PRINT SINGLE FEATURES
+                # for i, y in enumerate(torch.transpose(flattened_sample, 0, 1)):
+                #     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
+                #     x = range(len(y))
+                #     ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
+                #     save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{plots_file_ending}")
 
             # with torch.no_grad():
             #     generated_sample_count = 100
@@ -466,38 +486,27 @@ def main():
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
     start_date_str = DEFAULT_DATA_START_DATE
-    end_date_str = "2010-12-31 23:00:00"  # "2019-12-31 23:00:00"
-    start_date = convert_input_str_to_date(start_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
-    end_date = convert_input_str_to_date(end_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
+    end_date_str = "2019-12-31 23:00:00"  # "2019-12-31 23:00:00"
     data_importer = DWDWeatherDataImporter(start_date=start_date_str, end_date=end_date_str)
     data_importer.initialize()
-    # conditions = np.array([get_day_in_year_from_date(d) for d in interval_generator(start_date, end_date)])
+    conditions = np.array(data_importer.get_day_of_year_values()) - 1  # days to conditions from 0 - 365
+    columns_to_use = set(
+        [
+            WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+            WeatherDataColumns.DH_W_PER_M2,
+            # WeatherDataColumns.GH_W_PER_M2,
+            # WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
+        ]
+    )
     data_holder = DataHolder(
-        data=data_importer.data.values.astype(np.float32),
-        data_labels=data_importer.get_feature_labels(),
+        data=data_importer.get_data_subset(columns_to_use).values.astype(np.float32),
+        # data_labels=data_importer.get_feature_labels(),
         dates=np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
-        conditions=np.array(data_importer.get_day_of_year_values()),
+        conditions=conditions,
         normalizer_constructor=StandardNumpyNormalizer,
     )
 
-    train_data_save_path = save_images_path / "train_data"
-    train_data_save_path.mkdir(parents=True, exist_ok=True)
-    for (column_name, values_normalized) in zip(data_importer.data, data_holder.data):
-        decomp_result = STL(data_importer.data[column_name], period=365).fit()
-        decomp_result2 = STL(values_normalized, period=365).fit()
-        translations = {
-            DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
-            DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
-            DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
-            DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
-            DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
-        }
-        res = draw_timeseries_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
-        save_fig(res.fig, train_data_save_path / f"data_{column_name}.pdf")
-        res2 = draw_timeseries_plot(data=decomp_result2, translations=translations, figsize=(6.4, 6.4))
-        save_fig(res2.fig, train_data_save_path / f"data_normed_{column_name}.pdf")
-
-    train_params = ConditionalTrainParameters(batch_size=64, epochs=4000, embedding_dim=32)
+    train_params = ConditionalTrainParameters(batch_size=32, epochs=4000, embedding_dim=32)
 
     train_all_features(data_holder=data_holder, params=train_params)
 
