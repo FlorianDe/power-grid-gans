@@ -69,6 +69,9 @@ def plot_sample(
     for i, y in enumerate(torch.transpose(flattened_sample, 0, 1)):
         x = range(len(y))
         ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
+        single_fig, single_ax = plt.subplots(nrows=1, ncols=1)
+        single_ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
+        yield (single_fig, single_ax)
 
     ax.set_xlabel("$t$", fontsize=12)
     ax.set_ylabel(
