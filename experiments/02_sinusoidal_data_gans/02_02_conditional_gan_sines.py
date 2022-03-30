@@ -29,10 +29,10 @@ from experiments.experiments_utils.train_typing import (
     BatchReshaper,
     NoiseGenerator,
 )
-from experiments.experiments_utils.net_parsing import print_net_summary
+from src.net.summary.net_parsing import print_net_summary
 from experiments.experiments_utils.weight_init import init_weights
 
-from src.net.net_summary import LatexTableOptions, LatexTableStyle
+from src.net.summary.net_summary import LatexTableOptions, LatexTableStyle
 
 save_images_path = get_experiments_folder().joinpath("02_sinusoidal_data_gans").joinpath("02_02_conditional_gan_sines")
 save_images_path.mkdir(parents=True, exist_ok=True)

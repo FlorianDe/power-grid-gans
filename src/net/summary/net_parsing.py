@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch import Size, TensorType
 
-from src.net.net_summary import LatexTableOptions, create_summary
+from src.net.summary.net_summary import LatexTableOptions, create_summary
 
 
 def print_net_summary(

@@ -20,10 +20,10 @@ from experiments.experiments_utils.plotting import (
     plot_sample,
     save_fig,
 )
-from src.net.net_summary import LatexTableOptions, LatexTableStyle
+from src.net.summary.net_summary import LatexTableOptions, LatexTableStyle
 from experiments.experiments_utils.train_typing import TrainParameters, AdamParameters, BatchReshaper, NoiseGenerator
 from experiments.experiments_utils.sine_data import SineGenerationParameters, generate_sine_features
-from experiments.experiments_utils.net_parsing import print_net_summary
+from src.net.summary.net_parsing import print_net_summary
 
 save_images_path = get_experiments_folder().joinpath("02_sinusoidal_data_gans").joinpath("02_01_vanilla_gan_fnn_sines")
 save_images_path.mkdir(parents=True, exist_ok=True)

@@ -33,7 +33,7 @@ from src.data.normalization.np.standard_normalizer import StandardNumpyNormalize
 from src.data.typing import Feature
 from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 
-from src.net.net_summary import LatexTableOptions
+from src.net.summary.net_summary import LatexTableOptions
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
 from src.plots.typing import PlotData, PlotOptions
 from src.plots.violin_plot import draw_violin_plot
