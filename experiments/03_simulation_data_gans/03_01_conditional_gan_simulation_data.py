@@ -494,7 +494,8 @@ def main():
         [
             WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
             WeatherDataColumns.DH_W_PER_M2,
-            # WeatherDataColumns.GH_W_PER_M2,
+            WeatherDataColumns.GH_W_PER_M2,
+            WeatherDataColumns.WIND_DIR_DEGREE,
             # WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
         ]
     )

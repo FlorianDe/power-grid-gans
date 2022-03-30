@@ -8,7 +8,7 @@ from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWe
 from src.plots.timeseries_plot import DecomposeResultColumns, draw_timeseries_plot
 from src.utils.datetime_utils import dates_to_conditional_vectors
 import seaborn as sns
-from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.seasonal import STL, seasonal_decompose
 
 
 def save_fig(fig, path):
@@ -23,11 +23,14 @@ if __name__ == "__main__":
     explore_training_data_root_folder = (
         get_experiments_folder().joinpath("01_explore_weather_data").joinpath("03_training_data")
     )
-
+    explore_training_data_root_folder.mkdir(parents=True, exist_ok=True)
     start_date_str = DEFAULT_DATA_START_DATE
     end_date_str = "2019-12-31 23:00:00"  # "2019-12-31 23:00:00"
     data_importer = DWDWeatherDataImporter(start_date=start_date_str, end_date=end_date_str)
     data_importer.initialize()
+    print(f"Imported data with shape: {data_importer.data.shape}")
+    day_period = 24
+    year_period = 8766
     columns_to_use = set(
         [
             WeatherDataColumns.DH_W_PER_M2,
@@ -36,6 +39,13 @@ if __name__ == "__main__":
             WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
         ]
     )
+    translations = {
+        DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
+        DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
+        DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
+        DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
+        DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
+    }
     data_holder = DataHolder(
         data=data_importer.get_data_subset(columns_to_use).values.astype(np.float32),
         # data_labels=data_importer.get_feature_labels(),
@@ -43,18 +53,47 @@ if __name__ == "__main__":
         # conditions=conditions,
         normalizer_constructor=StandardNumpyNormalizer,
     )
-
+    print(f"Loaded data into dataholder")
+    decomp_save_path = explore_training_data_root_folder / "decomp"
+    decomp_save_path.mkdir(parents=True, exist_ok=True)
+    print(f"Normal decomposition")
     for (column_name, values_normalized) in zip(data_importer.data, data_holder.data):
-        decomp_result = STL(data_importer.data[column_name], period=365).fit()
-        decomp_result2 = STL(values_normalized, period=365).fit()
-        translations = {
-            DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
-            DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
-            DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
-            DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
-            DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
-        }
-        res = draw_timeseries_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
-        save_fig(res.fig, explore_training_data_root_folder / f"data_{column_name}.pdf")
-        res2 = draw_timeseries_plot(data=decomp_result2, translations=translations, figsize=(6.4, 6.4))
-        save_fig(res2.fig, explore_training_data_root_folder / f"data_normed_{column_name}.pdf")
+        print(f"Calculation decomposition for {column_name}")
+
+        decomp_result_year_only = seasonal_decompose(
+            data_importer.data[column_name], model="additive", period=year_period
+        )  # STL(year_data_input, period=year_period).fit()
+        print(f"Yearly only done")
+        res_year_only = draw_timeseries_plot(
+            data=decomp_result_year_only, translations=translations, figsize=(6.4, 6.4)
+        )
+        save_fig(res_year_only.fig, decomp_save_path / f"data_{column_name}_year_only.pdf")
+
+        decomp_result_daily = seasonal_decompose(
+            data_importer.data[column_name], model="additive", period=day_period
+        )  # STL(data_importer.data[column_name], period=day_period).fit()
+        res_daily = draw_timeseries_plot(data=decomp_result_daily, translations=translations, figsize=(6.4, 6.4))
+        save_fig(res_daily.fig, decomp_save_path / f"data_{column_name}_daily.pdf")
+
+        print(f"Daily done")
+        year_data_input = data_importer.data[column_name] - np.array(decomp_result_daily.seasonal)  # .reshape(-1, 1)
+        print(f"{year_data_input.shape=}")
+        decomp_result_year = seasonal_decompose(
+            year_data_input, model="additive", period=year_period
+        )  # STL(year_data_input, period=year_period).fit()
+        print(f"Yearly done")
+        res = draw_timeseries_plot(data=decomp_result_year, translations=translations, figsize=(6.4, 6.4))
+        save_fig(res.fig, decomp_save_path / f"data_{column_name}.pdf")
+
+        # decomp_result2 = STL(values_normalized, period=day_period).fit()
+        # res2 = draw_timeseries_plot(data=decomp_result2, translations=translations, figsize=(6.4, 6.4))
+        # save_fig(res2.fig, explore_training_data_root_folder / f"data_normed_{column_name}.pdf")
+
+    print(f"STL decomposition")
+    stl_save_path = explore_training_data_root_folder / "stl"
+    stl_save_path.mkdir(parents=True, exist_ok=True)
+    for (column_name, values_normalized) in zip(data_importer.data, data_holder.data):
+        print(f"Calculation stl for {column_name}")
+        decomp_result_daily = STL(data_importer.data[column_name], period=365).fit()
+        res = draw_timeseries_plot(data=decomp_result_year, translations=translations, figsize=(6.4, 6.4))
+        save_fig(res.fig, stl_save_path / f"data_{column_name}.pdf")

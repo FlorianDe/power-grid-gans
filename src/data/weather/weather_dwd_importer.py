@@ -80,7 +80,7 @@ class WeatherDataColumns(metaclass=FinalClass):
     WIND_DIR_DEGREE: Final[str] = "wind_dir_degree"  # Windrichtung in Grad [0 - 350] in 10er Schritten
     WIND_DIR_DEGREE_DELTA: Final[
         str
-    ] = "wind_dir_degree_delta"  # Windrichtung Änderung zum vorherigen Element in Grad [-180, 1806
+    ] = "wind_dir_degree_delta"  # Windrichtung Änderung zum vorherigen Element in Grad [-180, 180]
     CLOUD_PERCENT: Final[str] = "cloud_percent"  # Prozentuale Wolkenbedeckung
     SUN_HOURS_MIN_PER_H: Final[str] = "sun_hours_min_per_h"
 
@@ -178,13 +178,15 @@ class DWDWeatherDataImporter:
         self.__data_labels: list[str] = []
 
     def initialize(self):
+        print("1. Download step started.")
         self.__download()
+        print("2. Import step started.")
         self.__load()
         if self.auto_preprocess is True:
+            print("3. Preprocess step started.")
             self.__preprocess()
 
     def __load(self):
-        print(f"Loading and transforming data:")
         for dimension in self.dimensions:
             self.__load_data_dimension(dimension)
 
@@ -231,6 +233,8 @@ class DWDWeatherDataImporter:
                 print(f"Downloaded {file_download_url}")
                 unzip(self.path, weather_source_file_name, weatherDimension.value.lower())
                 print(f"Unzipped {weather_source_file_name}")
+            else:
+                print(f"Using cached values for dimension {weatherDimension}")
 
     def __load_data_dimension(self, target: WeatherDimension) -> None:
         target_dimension_name = target.value.lower()
