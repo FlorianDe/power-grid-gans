@@ -17,12 +17,13 @@ from src.utils.datetime_utils import format_timestamp
 class BaseTrainer:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self,
-                 generator: TrainModel,
-                 discriminator: TrainModel,
-                 data_holder: DataHolder,
-                 device: Union[torch.device, int, str] = 'cpu'
-                 ) -> None:
+    def __init__(
+        self,
+        generator: TrainModel,
+        discriminator: TrainModel,
+        data_holder: DataHolder,
+        device: Union[torch.device, int, str] = "cpu",
+    ) -> None:
         super().__init__()
         self.generator = generator
         self.discriminator = discriminator
@@ -50,13 +51,17 @@ class BaseTrainer:
 
         if model_file_path.exists():
             if overwrite is False:
-                raise ValueError("You have specified a directory which already contains a saved model. Allow to overwrite it or specify another folder!")
+                raise ValueError(
+                    "You have specified a directory which already contains a saved model. Allow to overwrite it or specify another folder!"
+                )
             else:
                 # keep a copy of an old training run in a backup folder
                 model_file_stats = model_file_path.stat()
                 backup_folder_name = format_timestamp(model_file_stats.st_ctime_ns)
                 backup_dir = p / backup_folder_name
-                print(f"Already found a saved model in this directory, creating a backup of the old one. Under: {backup_dir}")
+                print(
+                    f"Already found a saved model in this directory, creating a backup of the old one. Under: {backup_dir}"
+                )
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 for file in backup_files:
                     if file.exists():
