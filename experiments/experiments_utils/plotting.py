@@ -43,7 +43,11 @@ def save_fig(fig, path):
 
 
 def plot_sample(
-    sample: Tensor, params: TrainParameters, plot: tuple[Figure, Axes], condition: Optional[Union[int, str]] = None
+    sample: Tensor,
+    params: TrainParameters,
+    plot: tuple[Figure, Axes],
+    condition: Optional[Union[int, str]] = None,
+    generate_single_feature: bool = True,
 ) -> tuple[Figure, Axes]:
     sample = sample.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
     fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1)
@@ -71,7 +75,8 @@ def plot_sample(
         ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
         single_fig, single_ax = plt.subplots(nrows=1, ncols=1)
         single_ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
-        yield (single_fig, single_ax)
+        if generate_single_feature is True:
+            yield (single_fig, single_ax)
 
     ax.set_xlabel("$t$", fontsize=12)
     ax.set_ylabel(
@@ -79,7 +84,8 @@ def plot_sample(
         fontsize=12,
     )
     ax.legend(loc="upper right")
-    return fig, ax
+    if generate_single_feature is False:
+        return fig, ax
 
 
 def plot_train_data_overlayed(
