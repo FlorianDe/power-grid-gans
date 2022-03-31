@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Optional, Union
 from matplotlib import ticker
 from matplotlib.axes import Axes
@@ -70,7 +70,7 @@ def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, zoom_effect_options: 
     )
 
     bbox_patch1 = BboxPatch(bbox1, **asdict(zoom_effect_options.dest_connector_box_options))
-    bbox_patch2 = BboxPatch(bbox2, **asdict(zoom_effect_options.source_connector_box_options))
+    bbox_patch2 = BboxPatch(bbox2, zorder=100, **asdict(zoom_effect_options.source_connector_box_options))
 
     p = BboxConnectorPatch(
         bbox1,
@@ -124,8 +124,10 @@ def draw_zoom_line_plot(
     fig: Optional[Figure] = None,
 ) -> tuple[Figure, Union[Axes, list[Axes]]]:
     assert_equal_plot_data_len(raw_plot_data)
-    if len(raw_plot_data[0].data) != len(x):
-        raise ValueError("The length of the x values has to be equal to the length of every plot data.")
+    if raw_plot_data[0].data.size != x.size:
+        raise ValueError(
+            f"The length of the x values has to be equal to the length of every plot data {x.size=}, data size={raw_plot_data[0].data.size}."
+        )
 
     fig = fig if fig is not None else plt.figure(figsize=(9, 3))
     axs = fig.subplot_mosaic(
@@ -141,10 +143,11 @@ def draw_zoom_line_plot(
 
     ax_main = axs["main"]
     for plot_data in raw_plot_data:
-        ax_main.plot(x, plot_data.data)  # TODO LEGEND!
+        ax_main.plot(x, plot_data.data, label=plot_data.label)
     ax_main.xaxis.set_major_locator(main_box_options.xaxis_major_ticker_locator)
     ax_main.xaxis.set_major_formatter(main_box_options.xaxis_major_ticket_formatter)
     ax_main.tick_params(axis="x", labelrotation=30)
+    ax.legend(loc=plot_options.legend_location)
 
     for zoom_box_idx, zoom_box_options in enumerate(zoom_boxes_options):
         zoom_box = axs[f"{zoom_box_idx}"]
