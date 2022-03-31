@@ -6,7 +6,7 @@ from astral import LocationInfo
 from astral.sun import sun
 from pandas import DataFrame, Series, date_range
 
-from src.data.processor.pandas import PandasPreprocessor
+from src.data.processor.pandas import PandasProcessor
 from src.data.weather.sun_position_calculator import DayTime
 from src.utils.pandas_utils import iter_timeseries
 
@@ -14,11 +14,11 @@ WIND_DIRECTION_MAX_DEGREE = 360
 
 
 def clip_to_zero(data: Series) -> Series:
-    return PandasPreprocessor(data).clip(0).run()
+    return PandasProcessor(data).clip(0).run()
 
 
 def wind_dir_cleansing(data: Series) -> Series:
-    return PandasPreprocessor(data).clip(0).modulo(WIND_DIRECTION_MAX_DEGREE).run()
+    return PandasProcessor(data).clip(0).modulo(WIND_DIRECTION_MAX_DEGREE).run()
 
 
 def relative_wind_dir_calculation(raw_wind_directions: np.ndarray, _: Optional[float] = None) -> np.ndarray:

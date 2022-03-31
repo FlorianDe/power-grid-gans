@@ -1,9 +1,9 @@
 from pandas import Series
 
-from src.data.processor.preprocessor import Preprocessor
+from src.data.processor.processor import Processor
 
 
-class PandasPreprocessor(Preprocessor[Series]):
+class PandasProcessor(Processor[Series]):
     def clip(self, lower: float = None, upper: float = None):
         self.data = self.data.clip(lower, upper)
         return self

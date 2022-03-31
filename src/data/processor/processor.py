@@ -4,7 +4,7 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 
-class Preprocessor(Generic[T]):
+class Processor(Generic[T]):
     """
     STEPS:
     Data cleansing

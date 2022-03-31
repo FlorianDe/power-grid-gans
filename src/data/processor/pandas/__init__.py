@@ -1,1 +1,1 @@
-from .pandas_preprocessor import PandasPreprocessor
+from .pandas_processor import PandasProcessor
