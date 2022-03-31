@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Callable, Optional, Final
+from typing import List, Callable, Optional, Final, Union
 
 import numpy as np
 import pandas as pd
@@ -148,8 +148,8 @@ WEATHER_DATA_MAPPING: dict[WeatherDimension, WeatherDataSet] = {
 class DWDWeatherDataImporter:
     def __init__(
         self,
-        start_date: str = DEFAULT_DATA_START_DATE,
-        end_date: str = DEFAULT_DATA_END_DATE,
+        start_date: Union[str, datetime] = DEFAULT_DATA_START_DATE,
+        end_date: Union[str, datetime] = DEFAULT_DATA_END_DATE,
         auto_preprocess=True,
         dimensions: Optional[set[WeatherDataColumns]] = None,
         path: Optional[str] = None,
