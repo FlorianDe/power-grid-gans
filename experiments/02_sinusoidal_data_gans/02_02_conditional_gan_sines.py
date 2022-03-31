@@ -30,7 +30,7 @@ from experiments.experiments_utils.train_typing import (
     NoiseGenerator,
 )
 from src.net.summary.net_parsing import print_net_summary
-from experiments.experiments_utils.weight_init import init_weights
+from src.net.weight_init import init_weights
 
 from src.net.summary.net_summary import LatexTableOptions, LatexTableStyle
 
