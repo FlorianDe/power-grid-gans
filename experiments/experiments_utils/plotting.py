@@ -47,7 +47,7 @@ def plot_sample(
     params: TrainParameters,
     plot: tuple[Figure, Axes],
     condition: Optional[Union[int, str]] = None,
-    generate_single_feature: bool = True,
+    generate_single_features: bool = False,
 ) -> tuple[Figure, Axes]:
     sample = sample.cpu()  # We have to convert it to cpu too, to allow matplot to plot it
     fig, ax = plot if plot is not None else plt.subplots(nrows=1, ncols=1)
@@ -75,7 +75,7 @@ def plot_sample(
         ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
         single_fig, single_ax = plt.subplots(nrows=1, ncols=1)
         single_ax.plot(x, y, label=r"$f_{" + str(i) + r"}^{t}$")
-        if generate_single_feature is True:
+        if generate_single_features is True:
             yield (single_fig, single_ax)
 
     ax.set_xlabel("$t$", fontsize=12)
@@ -84,7 +84,7 @@ def plot_sample(
         fontsize=12,
     )
     ax.legend(loc="upper right")
-    if generate_single_feature is False:
+    if generate_single_features is False:
         return fig, ax
 
 

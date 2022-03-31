@@ -431,7 +431,7 @@ def create_plot_sample_fn(sample_save_path: PurePath, plots_file_ending: str = "
             generated_data = trainer.data_holder.normalizer.renormalize(generated_data)
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
         sample_generator = plot_sample(
-            sample=generated_data, params=trainer.params, plot=(fig, ax), condition="ALL", generate_single_feature=False
+            sample=generated_data, params=trainer.params, plot=(fig, ax), condition="ALL", generate_single_features=True
         )
         for idx, (fig, ax) in enumerate(sample_generator):
             save_fig(fig, sample_save_path / f"{epoch}_feat_{idx}_cond_ALL.{plots_file_ending}")
@@ -493,8 +493,8 @@ def setup_fnn_models_and_train(
     )
     optimizer_D = optim.Adam(model_D.parameters(), lr=lr, betas=(beta1, beta2))
     discriminator = TrainModel(model=model_D, optimizer=optimizer_D, scheduler=None)
+    init_weights(model_D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu", 1e-2))
 
-    # init_weights(G, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
     # init_weights(D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
 
     save_path.mkdir(parents=True, exist_ok=True)
@@ -540,7 +540,7 @@ def train_all_features(data_importer: DWDWeatherDataImporter, params: TrainParam
             WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
             WeatherDataColumns.DH_W_PER_M2,
             WeatherDataColumns.GH_W_PER_M2,
-            WeatherDataColumns.WIND_DIR_DEGREE,
+            # WeatherDataColumns.WIND_DIR_DEGREE,
             # WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
         ]
     )
@@ -603,4 +603,4 @@ def eval(epoch):
 
 if __name__ == "__main__":
     train()
-    # eval(epoch=10)
+    # eval(epoch=100)
