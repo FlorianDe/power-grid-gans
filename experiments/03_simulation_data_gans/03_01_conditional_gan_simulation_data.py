@@ -1,7 +1,8 @@
+from datetime import timedelta, datetime
 from pathlib import PurePath
 from typing import Optional
 import numpy as np
-from tqdm import tqdm
+import pandas as pd
 import seaborn as sns
 
 import random
@@ -10,6 +11,7 @@ from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
 
 from torch import Tensor
 
@@ -20,18 +22,21 @@ from experiments.experiments_utils.plotting import (
     plot_sample,
     save_fig,
 )
+from src.data.weather.weather_dwd_postprocessor import DWDWeatherPostProcessor
 from src.evaluator.evaluator import Evaluator
 from src.gan.trainer.cgan_trainer import CGANTrainer
-from src.gan.trainer.typing import ConditionalTrainParameters, TrainModel, TrainParameters, Trainer, TrainingEpoch
+from src.gan.trainer.typing import ConditionalTrainParameters, TrainModel, TrainingEpoch
 from src.data.data_holder import DataHolder
 from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
 from src.data.typing import Feature
 from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 
 from src.net.summary.net_summary import LatexTableOptions
+from src.net.weight_init import init_weights
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
 from src.plots.typing import PlotData, PlotOptions
 from src.plots.violin_plot import draw_violin_plot
+from src.plots.zoom_line_plot import ConnectorBoxOptions, ZoomBoxEffectOptions, ZoomPlotOptions, draw_zoom_line_plot
 from src.utils.datetime_utils import (
     convert_input_str_to_date,
     dates_to_conditional_vectors,
@@ -458,7 +463,6 @@ def create_save_model_fn(model_root_save_path: PurePath):
 
 def setup_fnn_models_and_train(
     data_holder: DataHolder,
-    params: ConditionalTrainParameters,
     save_path: PurePath,
     latex_options: Optional[LatexTableOptions],
     epochs: int,
@@ -469,8 +473,11 @@ def setup_fnn_models_and_train(
     beta1 = 0.9
     beta2 = 0.99
     conditions = 366  #
-    dropout = 0.5
+    dropout = 0.3
     features_len = data_holder.get_feature_size()
+    params = ConditionalTrainParameters(
+        batch_size=32, embedding_dim=int(24 * 1.5 * features_len), features_len=features_len
+    )
 
     model_G = GeneratorFNN(
         latent_vector_size=params.latent_vector_size,
@@ -481,7 +488,8 @@ def setup_fnn_models_and_train(
         embeddings=params.embedding_dim,
     )
     optimizer_G = optim.Adam(model_G.parameters(), lr=lr, betas=(beta1, beta2))
-    generator = TrainModel(model=model_G, optimizer=optimizer_G, scheduler=None)
+    scheduler_G = StepLR(optimizer_G, step_size=50, gamma=0.5)
+    generator = TrainModel(model=model_G, optimizer=optimizer_G, scheduler=scheduler_G)
 
     model_D = DiscriminatorFNN(
         features=features_len,
@@ -492,7 +500,8 @@ def setup_fnn_models_and_train(
         dropout=dropout,
     )
     optimizer_D = optim.Adam(model_D.parameters(), lr=lr, betas=(beta1, beta2))
-    discriminator = TrainModel(model=model_D, optimizer=optimizer_D, scheduler=None)
+    scheduler_D = StepLR(optimizer_D, step_size=50, gamma=0.5)
+    discriminator = TrainModel(model=model_D, optimizer=optimizer_D, scheduler=scheduler_D)
     init_weights(model_D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu", 1e-2))
 
     # init_weights(D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
@@ -530,7 +539,7 @@ def setup_fnn_models_and_train(
     return trainer
 
 
-def train_all_features(data_importer: DWDWeatherDataImporter, params: TrainParameters, epochs: int):
+def train_all_features(data_importer: DWDWeatherDataImporter, epochs: int):
     """
     Multivariate for conditional GAN with FNN
     """
@@ -556,9 +565,9 @@ def train_all_features(data_importer: DWDWeatherDataImporter, params: TrainParam
         label="conditional_gan_fnn_sines_net_simulation_data_{net_type}",
         # style=LatexTableStyle(scaleWithAdjustbox=1.0),
     )
+
     setup_fnn_models_and_train(
         data_holder=data_holder,
-        params=params,
         save_path=save_images_path / "fnn_all_features",
         latex_options=latex_options,
         epochs=epochs,
