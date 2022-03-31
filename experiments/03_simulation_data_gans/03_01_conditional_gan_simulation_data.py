@@ -575,41 +575,94 @@ def train_all_features(data_importer: DWDWeatherDataImporter, epochs: int):
 
 
 def train():
-    sns.set_theme()
-    sns.set_context("paper")
-    # sns.set_palette("colorblind")
-    set_latex_plot_params()
     manualSeed = 1337
     print("Random Seed: ", manualSeed)
     random.seed(manualSeed)
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
+
+    sns.set_theme()
+    sns.set_context("paper")
+    # sns.set_palette("colorblind")
+    set_latex_plot_params()
+
     start_date_str = DEFAULT_DATA_START_DATE
     end_date_str = "2019-12-31 23:00:00"  # "2019-12-31 23:00:00"
     data_importer = DWDWeatherDataImporter(start_date=start_date_str, end_date=end_date_str)
     data_importer.initialize()
     epochs = 4000
-    train_params = ConditionalTrainParameters(batch_size=32, embedding_dim=32)
 
-    train_all_features(data_importer=data_importer, params=train_params, epochs=epochs)
+    train_all_features(data_importer=data_importer, epochs=epochs)
 
 
 def eval(epoch):
+    manualSeed = 1337
+    random.seed(manualSeed)
+    torch.manual_seed(manualSeed)
+
+    set_latex_plot_params()
+
     model_path = save_images_path / "fnn_all_features" / "models" / str(epoch)
     evaluator = Evaluator.load(str(model_path))
-    start = convert_input_str_to_date("2023.01.01")
-    end = convert_input_str_to_date("2023.01.07")
+    start = datetime.fromisoformat("2023-01-01T00:00:00")
+    end = datetime.fromisoformat("2023-12-31T23:00:00")
     generated_data = evaluator.generate(start, end)
-    train_params = ConditionalTrainParameters(batch_size=32, embedding_dim=32)
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
-    sample_generator = plot_sample(
-        sample=generated_data, params=train_params, plot=(fig, ax), condition="ALL", generate_single_feature=False
+    # train_params = ConditionalTrainParameters(batch_size=32, embedding_dim=32)
+    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
+    # (fig, ax) = plot_sample(
+    #     sample=generated_data, params=train_params, plot=(fig, ax), condition="ALL", generate_single_features=False
+    # )
+
+    seperated_generated_data = torch.unbind(generated_data, -1)
+    dataframe = pd.DataFrame(
+        index=pd.date_range(
+            start=start,
+            end=end,
+            tz="Europe/Berlin",
+            freq="h",
+        )
     )
-    for idx, (fig, ax) in enumerate(sample_generator):
-        pass
+
+    for idx, data in enumerate(seperated_generated_data):
+        dataframe[evaluator.feature_labels[idx].label] = data.view(-1).numpy()
+
+    weather_post_processor = DWDWeatherPostProcessor()
+    dataframe = weather_post_processor(dataframe)
+    plot_options: dict[WeatherDataColumns, any] = {
+        WeatherDataColumns.GH_W_PER_M2: {"zoom_plot_label": r"Globalstrahlung $\frac{W}{m^{2}}$"},
+        WeatherDataColumns.DH_W_PER_M2: {"zoom_plot_label": r"Diffusstrahlung $\frac{W}{m^{2}}$"},
+        WeatherDataColumns.WIND_DIR_DEGREE: {"zoom_plot_label": r"Windrichtung $^{\circ}$"},
+        WeatherDataColumns.WIND_DIR_DEGREE_DELTA: {"zoom_plot_label": r"Windrichtungsänderung $^{\circ}$"},
+        WeatherDataColumns.T_AIR_DEGREE_CELSIUS: {"zoom_plot_label": r"Temperatur $^{\circ}C$"},
+    }
+    dates = np.array([d for d in interval_generator(start, end, delta=timedelta(hours=1))])
+    generated_labels = list(map(lambda feature: feature.label, evaluator.feature_labels))
+    print(f"{generated_labels=}")
+    plot_data = [
+        PlotData(data=dataframe[col].values, label=plot_option["zoom_plot_label"])
+        for col, plot_option in plot_options.items()
+        if col in generated_labels
+    ]
+    print(f"{plot_data=}")
+    fig, axes = draw_zoom_line_plot(
+        raw_plot_data=plot_data,
+        x=dates,
+        zoom_boxes_options=[
+            ZoomPlotOptions(
+                x_start=datetime.fromisoformat("2023-01-01T00:00:00"),
+                x_end=datetime.fromisoformat("2023-01-07T23:00:00"),
+                effect_options=ZoomBoxEffectOptions(source_connector_box_options=ConnectorBoxOptions()),
+            ),
+            ZoomPlotOptions(
+                x_start=datetime.fromisoformat("2023-08-01T00:00:00"),
+                x_end=datetime.fromisoformat("2023-08-07T23:00:00"),
+            ),
+        ],
+    )
+
     plt.show()
 
 
 if __name__ == "__main__":
-    train()
-    # eval(epoch=100)
+    # train()
+    eval(epoch=450)
