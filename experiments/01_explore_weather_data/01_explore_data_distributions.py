@@ -16,7 +16,7 @@ from src.data.weather.weather_dwd_importer import (
     WEATHER_DATA_MAPPING,
     DEFAULT_DATA_START_DATE,
 )
-from src.data.weather.weather_filters import exclude_night_time_values
+from src.data.weather.weather_filters import create_night_time_replace_handler
 from src.metrics.kullback_leibler import kl_divergence
 from src.metrics.r_squared import r_squared
 from src.metrics.wasserstein_distance import wasserstein_dist
@@ -99,6 +99,8 @@ def explore_data_distributions(options: DistributionFitOptions):
     importer = DWDWeatherDataImporter(start_date=start_date, end_date=end_date)
     importer.initialize()
     # extract all used targetColumns
+
+    exclude_night_time_values = create_night_time_replace_handler()
     target_column_extra_info: dict[str, list[DistributionPlotColumn]] = {
         WeatherDataColumns.T_AIR_DEGREE_CELSIUS: [
             DistributionPlotColumn(
