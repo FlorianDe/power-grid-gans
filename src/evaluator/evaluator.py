@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from typing import Optional, Union
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import Tensor
 from torch.jit import ScriptModule
@@ -47,7 +48,7 @@ class Evaluator:
                 y = self.normalizer.renormalize(y)
             return y
 
-    def generate(self, start_date: date, end_date: date, with_conditions=True) -> Tensor:
+    def generate(self, start_date: datetime, end_date: datetime, with_conditions=True) -> Tensor:
         with torch.no_grad():
             # outsource condition generation maybe
             batch_conditions = torch.from_numpy(
@@ -77,7 +78,23 @@ class Evaluator:
             #         result = current_res
             #     else:
             #         result = torch.cat((result, current_res), dim=-1)
-            return result
+
+    def generate_dataframe(self, start_date: datetime, end_date: datetime, with_conditions=True) -> pd.DataFrame:
+        generated_data = self.generate(start_date, end_date, with_conditions)
+        seperated_generated_data = torch.unbind(generated_data, -1)
+        dataframe = pd.DataFrame(
+            index=pd.date_range(
+                start=start_date,
+                end=end_date,
+                tz="Europe/Berlin",
+                freq="h",
+            )
+        )
+
+        for idx, data in enumerate(seperated_generated_data):
+            dataframe[self.feature_labels[idx].label] = data.view(-1).numpy()
+
+        return dataframe
 
     @staticmethod
     def load(path: Union[str, Path], device: torch.device = torch.device("cpu")) -> Evaluator:

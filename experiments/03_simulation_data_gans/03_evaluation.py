@@ -41,30 +41,12 @@ def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
     result_path.mkdir(parents=True, exist_ok=True)
 
     model_path = path / "models" / str(epoch)
-    evaluator = Evaluator.load(str(model_path))
+    evaluator = Evaluator.load(model_path)
     start = datetime.fromisoformat("2023-01-01T00:00:00")
     end = datetime.fromisoformat("2023-12-31T23:00:00")
-    generated_data = evaluator.generate(start, end)
-    # train_params = ConditionalTrainParameters(batch_size=32, embedding_dim=32)
-    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
-    # (fig, ax) = plot_sample(
-    #     sample=generated_data, params=train_params, plot=(fig, ax), condition="ALL", generate_single_features=False
-    # )
+    dataframe = evaluator.generate_dataframe(start, end)
 
-    seperated_generated_data = torch.unbind(generated_data, -1)
-    dataframe = pd.DataFrame(
-        index=pd.date_range(
-            start=start,
-            end=end,
-            tz="Europe/Berlin",
-            freq="h",
-        )
-    )
-
-    for idx, data in enumerate(seperated_generated_data):
-        dataframe[evaluator.feature_labels[idx].label] = data.view(-1).numpy()
-
-    def draw_weather_data_zoom_plot_sample_by_df(dataframe):
+    def __draw_weather_data_zoom_plot_sample_by_df(dataframe):
         return draw_weather_data_zoom_plot_sample(
             dataframe=dataframe,
             start=start,
@@ -81,7 +63,7 @@ def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
             ],
         )
 
-    fig, axes = draw_weather_data_zoom_plot_sample_by_df(dataframe)
+    fig, axes = __draw_weather_data_zoom_plot_sample_by_df(dataframe)
     fig.savefig(
         result_path / f"zoom_line_sample_plot_{epoch}_before_post_processing.{plot_file_ending}",
         bbox_inches="tight",
@@ -90,10 +72,8 @@ def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
 
     weather_post_processor = DWDWeatherPostProcessor()
     dataframe = weather_post_processor(dataframe)
-    fig, axes = draw_weather_data_zoom_plot_sample_by_df(dataframe)
+    fig, axes = __draw_weather_data_zoom_plot_sample_by_df(dataframe)
     fig.savefig(result_path / f"zoom_line_sample_plot_{epoch}.{plot_file_ending}", bbox_inches="tight", pad_inches=0)
-
-    plt.close(fig)
 
 
 if __name__ == "__main__":
