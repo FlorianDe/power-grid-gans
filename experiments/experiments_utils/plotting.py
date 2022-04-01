@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional, Union
 
@@ -8,14 +9,18 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib import ticker
+import pandas as pd
 
 import torch
 from torch import Tensor
+from src.data.weather.weather_dwd_importer import WeatherDataColumns
 
-from src.plots.typing import Locale
+from src.plots.typing import Locale, PlotData
 
 from experiments.experiments_utils.sine_data import SineGenerationParameters
 from experiments.experiments_utils.train_typing import TrainParameters
+from src.plots.zoom_line_plot import ZoomBoxEffectOptions, draw_zoom_line_plot
+from src.utils.datetime_utils import interval_generator
 
 PLOT_LANG = Locale.DE
 
@@ -271,3 +276,38 @@ def plot_model_losses(g_losses: list[any], d_losses: list[any], current_epoch: i
     # ax_epochs.set_xbound(ax_iter.get_xbound())
 
     return fig, ax_iter
+
+
+def draw_weather_data_zoom_plot_sample(
+    dataframe: pd.DataFrame,
+    start: datetime,
+    end: datetime,
+    zoom_boxes_options: list[ZoomBoxEffectOptions],
+    cols_top: list[WeatherDataColumns] = [WeatherDataColumns.WIND_V_M_PER_S, WeatherDataColumns.T_AIR_DEGREE_CELSIUS],
+    cols_mid: list[WeatherDataColumns] = [
+        WeatherDataColumns.GH_W_PER_M2,
+        WeatherDataColumns.DH_W_PER_M2,
+        WeatherDataColumns.WIND_DIR_DEGREE,
+    ],
+):
+    dates = np.array([d for d in interval_generator(start, end, delta=timedelta(hours=1))])
+    plot_options: dict[WeatherDataColumns, any] = {
+        WeatherDataColumns.GH_W_PER_M2: {"zoom_plot_label": r"Globalstrahlung $\frac{W}{m^{2}}$"},
+        WeatherDataColumns.DH_W_PER_M2: {"zoom_plot_label": r"Diffusstrahlung $\frac{W}{m^{2}}$"},
+        WeatherDataColumns.WIND_DIR_DEGREE: {"zoom_plot_label": r"Windrichtung $^{\circ}$"},
+        WeatherDataColumns.WIND_DIR_DEGREE_DELTA: {"zoom_plot_label": r"Windrichtungsänderung $^{\circ}$"},
+        WeatherDataColumns.WIND_V_M_PER_S: {"zoom_plot_label": r"Windgeschwindigkeit $\frac{m}{s}$"},
+        WeatherDataColumns.T_AIR_DEGREE_CELSIUS: {"zoom_plot_label": r"Temperatur $^{\circ}C$"},
+    }
+    plot_data_top = [
+        PlotData(data=dataframe[col].values, label=plot_options[col]["zoom_plot_label"]) for col in cols_top
+    ]
+    plot_data_mid = [
+        PlotData(data=dataframe[col].values, label=plot_options[col]["zoom_plot_label"]) for col in cols_mid
+    ]
+    fig, axes = draw_zoom_line_plot(
+        raw_plot_data_rows=[plot_data_mid, plot_data_top],
+        x=dates,
+        zoom_boxes_options=zoom_boxes_options,
+    )
+    return fig, axes
