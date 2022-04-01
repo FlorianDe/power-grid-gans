@@ -175,7 +175,6 @@ class DWDWeatherDataImporter:
                 freq="H",
             )
         )
-        self.__data_labels: list[str] = []
 
     def initialize(self):
         print("1. Download step started.")
@@ -190,20 +189,7 @@ class DWDWeatherDataImporter:
         for dimension in self.dimensions:
             self.__load_data_dimension(dimension)
 
-        # data = data.clip(lower=0) # clip outlier data
-
-        # path = os.path.join(path, "weather_bre2009-2019.hdf5")
         # data.to_hdf(output_path, "weather", "w") # export data to hdf
-        # data = data.loc['2009-01-01 00:00:00':'2009-12-4 23:00:00'] # redefine timespan
-        # plot([
-        #     data['wind_dir_degree'],
-        #     data['wind_v_m_per_s'],
-        #     data['t_air_degree_celsius'],
-        #     data['day_avg_t_air_degree_celsius'],
-        #     data['day_avg_t_air_degree_celsius'],
-        #     data['dh_w_per_m2'],
-        #     data['gh_w_per_m2'],
-        # ])
 
     def __preprocess(self):
         for dimension in WEATHER_DATA_MAPPING.keys():
@@ -215,14 +201,6 @@ class DWDWeatherDataImporter:
                     self.data[target] = processed_data
 
     def __download(self):
-        # needed for export
-        # if filename is None:
-        #     filename = "WeatherBre2009-2019.hdf5"
-        # output_path = os.path.abspath(os.path.join(path, filename))
-        # if os.path.exists(output_path):
-        #     return True
-
-        # path = os.path.join(self.path, "tmp")
         os.makedirs(self.path, exist_ok=True)
 
         for weatherDimension, weatherSource in WEATHER_DATA_MAPPING.items():
@@ -263,7 +241,6 @@ class DWDWeatherDataImporter:
 
     def _assign_column_data(self, target_column, values):
         self.data[target_column] = values
-        self.__data_labels.append(target_column)
 
     def get_datetime_values(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return get_datetime_values(self.data)
@@ -272,7 +249,7 @@ class DWDWeatherDataImporter:
         return get_day_of_year_values(self.data)
 
     def get_feature_labels(self):
-        return self.__data_labels
+        return self.data.columns
 
     def get_data_subset(self, columns: Optional[set[WeatherDataColumns]] = None) -> DataFrame:
         if columns is None or len(columns) == 0:
