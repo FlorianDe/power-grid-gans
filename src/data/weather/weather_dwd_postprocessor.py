@@ -1,9 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from pandas import DataFrame
+from pandas import DataFrame, Series
+from src.data.processor.pandas import PandasProcessor
 from src.data.weather.weather_dwd_importer import ExtraCalculatedMapping, WeatherDataColumns
-from src.data.weather.weather_filters import replace_night_time_values_with_zero, wind_dir_cleansing
+from src.data.weather.weather_filters import (
+    create_night_time_replace_handler,
+    wind_dir_cleansing,
+)
 
 
 @dataclass
@@ -12,10 +16,31 @@ class ColumnProcessorOptions:
     post_processor: Optional[Callable[[DataFrame], DataFrame]] = None
 
 
+def solar_irradiance_posprocessor(data: Series) -> Series:
+    min_solar_irradiance = 0
+    max_solar_irradiance = 1200
+    night_time_replacer = create_night_time_replace_handler(night_time_element_value=0)
+    return night_time_replacer(PandasProcessor(data).clip(min_solar_irradiance, max_solar_irradiance).run())
+
+
+def clamp_temperature(data: Series) -> Series:
+    min_temp = -50
+    max_temp = 60
+    return PandasProcessor(data).clip(min_temp, max_temp).run()
+
+
+def clamp_wind_speed(data: Series) -> Series:
+    min_speed = 0
+    max_speed = 60  # 60m/s equal to 216 km/h
+    return PandasProcessor(data).clip(min_speed, max_speed).run()
+
+
 DEFAULT_DWD_WEATHER_PROCESSOR_OPTIONS: dict[WeatherDataColumns, ColumnProcessorOptions] = {
-    WeatherDataColumns.GH_W_PER_M2: ColumnProcessorOptions(post_processor=replace_night_time_values_with_zero),
-    WeatherDataColumns.DH_W_PER_M2: ColumnProcessorOptions(post_processor=replace_night_time_values_with_zero),
+    WeatherDataColumns.GH_W_PER_M2: ColumnProcessorOptions(post_processor=solar_irradiance_posprocessor),
+    WeatherDataColumns.DH_W_PER_M2: ColumnProcessorOptions(post_processor=solar_irradiance_posprocessor),
+    WeatherDataColumns.WIND_V_M_PER_S: ColumnProcessorOptions(post_processor=clamp_wind_speed),
     WeatherDataColumns.WIND_DIR_DEGREE: ColumnProcessorOptions(post_processor=wind_dir_cleansing),
+    WeatherDataColumns.T_AIR_DEGREE_CELSIUS: ColumnProcessorOptions(post_processor=clamp_temperature),
 }
 
 

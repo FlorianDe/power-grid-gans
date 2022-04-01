@@ -22,11 +22,6 @@ def wind_dir_cleansing(data: Series) -> Series:
     return PandasProcessor(data).clip(0).modulo(WIND_DIRECTION_MAX_DEGREE).run()
 
 
-def replace_night_time_values_with_zero(data: Series) -> Series:
-    night_time_replacer = create_night_time_replace_handler(night_time_element_value=0)
-    return night_time_replacer(PandasProcessor(data).clip(0).run())
-
-
 def relative_wind_dir_calculation(raw_wind_directions: np.ndarray, _: Optional[float] = None) -> np.ndarray:
     wind_direction_deltas = np.ediff1d(raw_wind_directions, to_begin=0)
     delta_overshoots_indices = np.where((np.abs(wind_direction_deltas) > (WIND_DIRECTION_MAX_DEGREE // 2)))
