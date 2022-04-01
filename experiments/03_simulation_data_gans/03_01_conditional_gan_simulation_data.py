@@ -539,23 +539,15 @@ def setup_fnn_models_and_train(
     return trainer
 
 
-def train_all_features(data_importer: DWDWeatherDataImporter, epochs: int):
+def train_features(data_importer: DWDWeatherDataImporter, columns: set[WeatherDataColumns], epochs: int, path: str):
     """
     Multivariate for conditional GAN with FNN
     """
     conditions = np.array(data_importer.get_day_of_year_values()) - 1  # days to conditions from 0 - 365
-    columns_to_use = set(
-        [
-            WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
-            WeatherDataColumns.DH_W_PER_M2,
-            WeatherDataColumns.GH_W_PER_M2,
-            # WeatherDataColumns.WIND_DIR_DEGREE,
-            # WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
-        ]
-    )
+    data_subset = data_importer.get_data_subset(columns)
     data_holder = DataHolder(
-        data=data_importer.get_data_subset(columns_to_use).values.astype(np.float32),
-        # data_labels=data_importer.get_feature_labels(),
+        data=data_subset.values.astype(np.float32),
+        data_labels=data_subset.columns.to_list(),
         dates=np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
         conditions=conditions,
         normalizer_constructor=StandardNumpyNormalizer,
@@ -568,10 +560,35 @@ def train_all_features(data_importer: DWDWeatherDataImporter, epochs: int):
 
     setup_fnn_models_and_train(
         data_holder=data_holder,
-        save_path=save_images_path / "fnn_all_features",
+        save_path=save_images_path / path,
         latex_options=latex_options,
         epochs=epochs,
     )
+
+
+def train_sun_temp_features(data_importer: DWDWeatherDataImporter, epochs: int):
+    columns_to_use = set(
+        [
+            WeatherDataColumns.GH_W_PER_M2,
+            WeatherDataColumns.DH_W_PER_M2,
+            WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+        ]
+    )
+
+    train_features(data_importer=data_importer, columns=columns_to_use, epochs=epochs, path="fnn_features_sun_temp")
+
+
+def train_all_features(data_importer: DWDWeatherDataImporter, epochs: int):
+    columns_to_use = set(
+        [
+            WeatherDataColumns.GH_W_PER_M2,
+            WeatherDataColumns.DH_W_PER_M2,
+            WeatherDataColumns.WIND_DIR_DEGREE,
+            WeatherDataColumns.WIND_V_M_PER_S,
+            WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+        ]
+    )
+    train_features(data_importer=data_importer, columns=columns_to_use, epochs=epochs, path="fnn_features_all")
 
 
 def train():
@@ -593,76 +610,8 @@ def train():
     epochs = 4000
 
     train_all_features(data_importer=data_importer, epochs=epochs)
-
-
-def eval(epoch):
-    manualSeed = 1337
-    random.seed(manualSeed)
-    torch.manual_seed(manualSeed)
-
-    set_latex_plot_params()
-
-    model_path = save_images_path / "fnn_all_features" / "models" / str(epoch)
-    evaluator = Evaluator.load(str(model_path))
-    start = datetime.fromisoformat("2023-01-01T00:00:00")
-    end = datetime.fromisoformat("2023-12-31T23:00:00")
-    generated_data = evaluator.generate(start, end)
-    # train_params = ConditionalTrainParameters(batch_size=32, embedding_dim=32)
-    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(30, 1))
-    # (fig, ax) = plot_sample(
-    #     sample=generated_data, params=train_params, plot=(fig, ax), condition="ALL", generate_single_features=False
-    # )
-
-    seperated_generated_data = torch.unbind(generated_data, -1)
-    dataframe = pd.DataFrame(
-        index=pd.date_range(
-            start=start,
-            end=end,
-            tz="Europe/Berlin",
-            freq="h",
-        )
-    )
-
-    for idx, data in enumerate(seperated_generated_data):
-        dataframe[evaluator.feature_labels[idx].label] = data.view(-1).numpy()
-
-    weather_post_processor = DWDWeatherPostProcessor()
-    dataframe = weather_post_processor(dataframe)
-    plot_options: dict[WeatherDataColumns, any] = {
-        WeatherDataColumns.GH_W_PER_M2: {"zoom_plot_label": r"Globalstrahlung $\frac{W}{m^{2}}$"},
-        WeatherDataColumns.DH_W_PER_M2: {"zoom_plot_label": r"Diffusstrahlung $\frac{W}{m^{2}}$"},
-        WeatherDataColumns.WIND_DIR_DEGREE: {"zoom_plot_label": r"Windrichtung $^{\circ}$"},
-        WeatherDataColumns.WIND_DIR_DEGREE_DELTA: {"zoom_plot_label": r"Windrichtungsänderung $^{\circ}$"},
-        WeatherDataColumns.T_AIR_DEGREE_CELSIUS: {"zoom_plot_label": r"Temperatur $^{\circ}C$"},
-    }
-    dates = np.array([d for d in interval_generator(start, end, delta=timedelta(hours=1))])
-    generated_labels = list(map(lambda feature: feature.label, evaluator.feature_labels))
-    print(f"{generated_labels=}")
-    plot_data = [
-        PlotData(data=dataframe[col].values, label=plot_option["zoom_plot_label"])
-        for col, plot_option in plot_options.items()
-        if col in generated_labels
-    ]
-    print(f"{plot_data=}")
-    fig, axes = draw_zoom_line_plot(
-        raw_plot_data=plot_data,
-        x=dates,
-        zoom_boxes_options=[
-            ZoomPlotOptions(
-                x_start=datetime.fromisoformat("2023-01-01T00:00:00"),
-                x_end=datetime.fromisoformat("2023-01-07T23:00:00"),
-                effect_options=ZoomBoxEffectOptions(source_connector_box_options=ConnectorBoxOptions()),
-            ),
-            ZoomPlotOptions(
-                x_start=datetime.fromisoformat("2023-08-01T00:00:00"),
-                x_end=datetime.fromisoformat("2023-08-07T23:00:00"),
-            ),
-        ],
-    )
-
-    plt.show()
+    # train_sun_temp_features(data_importer=data_importer, epochs=epochs)
 
 
 if __name__ == "__main__":
-    # train()
-    eval(epoch=450)
+    train()
