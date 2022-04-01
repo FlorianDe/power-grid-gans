@@ -1,8 +1,6 @@
 from datetime import timedelta
 from matplotlib import pyplot as plt
-import matplotlib.dates as mdates
 import numpy as np
-import seaborn as sns
 from src.plots.typing import PlotData
 from src.plots.zoom_line_plot import ConnectorBoxOptions, ZoomBoxEffectOptions, ZoomPlotOptions, draw_zoom_line_plot
 
@@ -11,10 +9,6 @@ from src.utils.datetime_utils import convert_input_str_to_date, interval_generat
 
 
 def test_draw_zoom_line_plot():
-    # sns.set_theme()
-    # sns.set_style("whitegrid")
-    # sns.set_context("paper")
-
     f = lambda x, m, b: m * x + b
 
     start = convert_input_str_to_date("2023.01.01")
@@ -25,7 +19,7 @@ def test_draw_zoom_line_plot():
     y = f(x, 2, 1)
 
     draw_zoom_line_plot(
-        raw_plot_data=[PlotData(data=y, label="test_data")],
+        raw_plot_data_rows=[[PlotData(data=y, label="test_data")]],
         x=dates,
         zoom_boxes_options=[
             ZoomPlotOptions(
@@ -38,4 +32,4 @@ def test_draw_zoom_line_plot():
             ),
         ],
     )
-    # plt.show()
+    plt.show()

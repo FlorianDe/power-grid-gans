@@ -1,4 +1,6 @@
 from dataclasses import asdict, dataclass
+from functools import reduce
+from turtle import color
 from typing import Optional, Union
 from matplotlib import ticker
 from matplotlib.axes import Axes
@@ -38,7 +40,7 @@ class ConnectorOptions:
 class ConnectorBoxOptions:
     facecolor: Optional[PlotColor] = None
     edgecolor: Optional[PlotColor] = "black"
-    alpha: float = 0.2
+    alpha: float = 0.1
     linestyle: Optional[str] = None
     linewidth: float = 1.0
 
@@ -59,18 +61,29 @@ class ZoomPlotOptions:
     xaxis_major_ticker_locator: ticker.Locator = mdates.DayLocator(interval=1)
     xaxis_major_ticket_formatter: ticker.Formatter = mdates.DateFormatter("%d.%b")
     effect_options: ZoomBoxEffectOptions = ZoomBoxEffectOptions()
+    yscale: str = "linear"
 
 
 def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, zoom_effect_options: ZoomBoxEffectOptions):
     c1 = BboxConnector(
-        bbox1, bbox2, loc1=loc1a, loc2=loc2a, clip_on=False, **asdict(zoom_effect_options.first_connector_options)
+        bbox1,
+        bbox2,
+        loc1=loc1a,
+        loc2=loc2a,
+        clip_on=False,
+        **asdict(zoom_effect_options.first_connector_options),
     )
     c2 = BboxConnector(
-        bbox1, bbox2, loc1=loc1b, loc2=loc2b, clip_on=False, **asdict(zoom_effect_options.second_connector_options)
+        bbox1,
+        bbox2,
+        loc1=loc1b,
+        loc2=loc2b,
+        clip_on=False,
+        **asdict(zoom_effect_options.second_connector_options),
     )
 
-    bbox_patch1 = BboxPatch(bbox1, **asdict(zoom_effect_options.dest_connector_box_options))
-    bbox_patch2 = BboxPatch(bbox2, zorder=100, **asdict(zoom_effect_options.source_connector_box_options))
+    bbox_patch1 = BboxPatch(bbox1, zorder=0, **asdict(zoom_effect_options.dest_connector_box_options))
+    bbox_patch2 = BboxPatch(bbox2, zorder=0, **asdict(zoom_effect_options.source_connector_box_options))
 
     p = BboxConnectorPatch(
         bbox1,
@@ -81,6 +94,7 @@ def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, zoom_effect_options: 
         loc1b=loc1b,
         loc2b=loc2b,
         clip_on=False,
+        zorder=100,
         **asdict(zoom_effect_options.connector_patch_options),
     )
 
@@ -116,52 +130,70 @@ def add_zoom_effect(ax1, ax2, zoom_effect_options: ZoomBoxEffectOptions):
 
 
 def draw_zoom_line_plot(
-    raw_plot_data: list[PlotData[npt.ArrayLike]],
+    raw_plot_data_rows: list[list[PlotData[npt.ArrayLike]]],
     x: npt.ArrayLike,
     zoom_boxes_options: list[ZoomPlotOptions],
     main_box_options: MainPlotOptions = MainPlotOptions(),
     plot_options: PlotOptions = PlotOptions(),
     fig: Optional[Figure] = None,
 ) -> tuple[Figure, Union[Axes, list[Axes]]]:
-    assert_equal_plot_data_len(raw_plot_data)
-    if raw_plot_data[0].data.size != x.size:
+    assert_equal_plot_data_len(reduce(lambda x, y: x + y, raw_plot_data_rows, []))
+    if raw_plot_data_rows[0][0].data.size != x.size:
         raise ValueError(
             f"The length of the x values has to be equal to the length of every plot data {x.size=}, data size={raw_plot_data[0].data.size}."
         )
 
-    fig = fig if fig is not None else plt.figure(figsize=(9, 3))
+    fig = fig if fig is not None else plt.figure(figsize=(12, 2.4 * len(raw_plot_data_rows)))
+    mosaic_descr = [["main" for _ in range(len(zoom_boxes_options))]]
+    for row in range(len(raw_plot_data_rows)):
+        row_desc = [f"{row}{col}" for col in range(len(zoom_boxes_options))]
+        mosaic_descr.insert(0, row_desc)
     axs = fig.subplot_mosaic(
-        [
-            [str(z) for z in range(len(zoom_boxes_options))],
-            ["main" for _ in range(len(zoom_boxes_options))],
-        ],
+        mosaic_descr,
         # gridspec_kw={"width_ratios": [9, 2]},
     )
 
     for ax in axs.values():
         ax.grid(True, axis="both", linestyle="-")
 
+    prop_cycle = plt.rcParams["axes.prop_cycle"]
+    cmap = prop_cycle.by_key()["color"]
+    cmap_idx = 0
     ax_main = axs["main"]
-    for plot_data in raw_plot_data:
-        ax_main.plot(x, plot_data.data, label=plot_data.label)
+    for raw_plot_data in raw_plot_data_rows:
+        for plot_data in raw_plot_data:
+            ax_main.plot(x, plot_data.data, label=plot_data.label, color=cmap[cmap_idx])
+            cmap_idx += 1
     ax_main.xaxis.set_major_locator(main_box_options.xaxis_major_ticker_locator)
     ax_main.xaxis.set_major_formatter(main_box_options.xaxis_major_ticket_formatter)
     ax_main.tick_params(axis="x", labelrotation=30)
-    ax.legend(loc=plot_options.legend_location)
+    ax.legend(loc="right", prop={"size": 8})
 
     for zoom_box_idx, zoom_box_options in enumerate(zoom_boxes_options):
-        zoom_box = axs[f"{zoom_box_idx}"]
-        zoom_box_options.x_start
-        zoom_box_options.x_end
+        cmap_idx = 0
+        for row_idx, raw_plot_data in enumerate(raw_plot_data_rows):
+            zoom_box = axs[f"{row_idx}{zoom_box_idx}"]
+            zoom_box_options.x_start
+            zoom_box_options.x_end
 
-        zoom_x_indexes = np.where(np.logical_and(zoom_box_options.x_start <= x, x <= zoom_box_options.x_end))
-        x_zoom_box = x[zoom_x_indexes]
-        for plot_data in raw_plot_data:
-            zoom_box.plot(x_zoom_box, plot_data.data[zoom_x_indexes])
+            zoom_x_indexes = np.where(np.logical_and(zoom_box_options.x_start <= x, x <= zoom_box_options.x_end))
+            x_zoom_box = x[zoom_x_indexes]
+            for plot_data in raw_plot_data:
+                zoom_box.plot(x_zoom_box, plot_data.data[zoom_x_indexes], color=cmap[cmap_idx])
+                cmap_idx += 1
 
-        zoom_box.xaxis.set_major_locator(mdates.DayLocator(interval=1))
-        zoom_box.xaxis.set_major_formatter(mdates.DateFormatter("%d.%b"))
-        zoom_box.tick_params(axis="x", labelrotation=30, labeltop=True, bottom=False, top=True, labelbottom=False)
-        add_zoom_effect(zoom_box, ax_main, zoom_box_options.effect_options)
+            zoom_box.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            zoom_box.xaxis.set_major_formatter(mdates.DateFormatter("%d.%b"))
+            zoom_box.tick_params(axis="x", labelrotation=30, labeltop=True, bottom=False, top=True, labelbottom=False)
+            ax.set_zorder(10)
+            if row_idx != len(raw_plot_data_rows) - 1:
+                zoom_box.tick_params(axis="x", labeltop=False, bottom=False, top=False, labelbottom=False)
+
+            # TODO workaround!
+            zoom_box_options.effect_options.first_connector_options.alpha = 0.0 if row_idx != 0 else 1.0
+            zoom_box_options.effect_options.second_connector_options.alpha = 0.0 if row_idx != 0 else 1.0
+
+            zoom_from = axs[f"{row_idx-1}{zoom_box_idx}"] if row_idx != 0 else ax_main
+            add_zoom_effect(zoom_box, zoom_from, zoom_box_options.effect_options)
 
     return (fig, axs)
