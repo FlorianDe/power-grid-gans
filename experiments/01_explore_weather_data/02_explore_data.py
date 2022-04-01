@@ -1,8 +1,12 @@
 from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 import numpy as np
+
+import seaborn as sns
+
+
 from experiments.experiments_utils.plotting import draw_weather_data_zoom_plot_sample
-from experiments.experiments_utils.utils import get_experiments_folder
+from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
 
 from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
 from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
@@ -63,11 +67,13 @@ def check_processed_unprocessed_data():
 
 
 if __name__ == "__main__":
+    set_latex_plot_params()
+    sns.set_palette("deep", color_codes=True)
     # check_processed_unprocessed_data()
     explore_data_root_folder = get_experiments_folder().joinpath("01_explore_weather_data").joinpath("02_explore_data")
     explore_data_root_folder.mkdir(parents=True, exist_ok=True)
 
-    for year in range(2010, 2020):
+    for year in range(2009, 2020):
         fig, axes = draw_weather_data_trainings_data_time_series_zoom_plot(year)
         plt.savefig(
             explore_data_root_folder / f"dwd_weather_data_{year}_zoom_plot.pdf", bbox_inches="tight", pad_inches=0
