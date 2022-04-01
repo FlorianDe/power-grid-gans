@@ -12,8 +12,6 @@ astral===2.2
     # via -r requirements.in
 atari-py==0.2.9
     # via -r requirements.in
-atomicwrites==1.4.0
-    # via pytest
 attrs==21.2.0
     # via pytest
 cachetools==4.2.4
@@ -26,8 +24,6 @@ charset-normalizer==2.0.9
     # via requests
 cloudpickle==2.0.0
     # via gym
-colorama==0.4.4
-    # via pytest
 cryptography==36.0.1
     # via pandapower
 cycler==0.11.0
@@ -66,12 +62,15 @@ matplotlib===3.4.2
     #   seaborn
 networkx==2.6.3
     # via pandapower
+numexpr==2.8.1
+    # via tables
 numpy==1.20.3
     # via
     #   atari-py
     #   gym
     #   imageio
     #   matplotlib
+    #   numexpr
     #   opencv-python
     #   pandapower
     #   pandas
@@ -80,6 +79,7 @@ numpy==1.20.3
     #   scipy
     #   seaborn
     #   statsmodels
+    #   tables
     #   tensorboard
     #   tensorboardx
     #   torchvision
@@ -91,8 +91,10 @@ openpyxl==3.0.9
     # via pandapower
 packaging==21.3
     # via
+    #   numexpr
     #   pandapower
     #   pytest
+    #   tables
 pandapower===2.6.0
     # via -r requirements.in
 pandas===1.3.4
@@ -167,6 +169,8 @@ six==1.16.0
     #   patsy
     #   python-dateutil
 statsmodels===0.12.2
+    # via -r requirements.in
+tables==3.7.0
     # via -r requirements.in
 tensorboard-data-server==0.6.1
     # via tensorboard

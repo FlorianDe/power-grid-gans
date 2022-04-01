@@ -3,6 +3,8 @@ from pathlib import PurePath
 import numpy as np
 import pandas as pd
 
+import seaborn as sns
+
 import random
 from matplotlib import pyplot as plt
 import torch
@@ -29,6 +31,8 @@ from src.utils.datetime_utils import (
     interval_generator,
 )
 
+# def ks_test_on_every_feature():
+
 
 def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
     manualSeed = 1337
@@ -36,6 +40,7 @@ def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
     torch.manual_seed(manualSeed)
 
     set_latex_plot_params()
+    sns.set_palette("deep", color_codes=True)
 
     result_path = path / "results" / str(epoch)
     result_path.mkdir(parents=True, exist_ok=True)
@@ -45,6 +50,7 @@ def eval(path: PurePath, epoch: int, plot_file_ending="pdf"):
     start = datetime.fromisoformat("2023-01-01T00:00:00")
     end = datetime.fromisoformat("2023-12-31T23:00:00")
     dataframe = evaluator.generate_dataframe(start, end)
+    dataframe.to_hdf(result_path / "result_generated_data.hdf", "weather", "w")
 
     def __draw_weather_data_zoom_plot_sample_by_df(dataframe):
         return draw_weather_data_zoom_plot_sample(
