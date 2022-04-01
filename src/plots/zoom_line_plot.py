@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass
 from functools import reduce
+import locale
 from turtle import color
 from typing import Optional, Union
 from matplotlib import ticker
@@ -14,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 from src.plots.plot_utils import assert_equal_plot_data_len
 
-from src.plots.typing import PlotColor, PlotData, PlotOptions
+from src.plots.typing import Locale, PlotColor, PlotData, PlotOptions
 from matplotlib.patches import ConnectionPatch
 
 #  Base code from:
@@ -38,9 +39,9 @@ class ConnectorOptions:
 
 @dataclass
 class ConnectorBoxOptions:
-    facecolor: Optional[PlotColor] = None
+    facecolor: Optional[PlotColor] = "lightskyblue"
     edgecolor: Optional[PlotColor] = "black"
-    alpha: float = 0.1
+    alpha: float = 0.2
     linestyle: Optional[str] = None
     linewidth: float = 1.0
 
@@ -83,7 +84,11 @@ def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, zoom_effect_options: 
     )
 
     bbox_patch1 = BboxPatch(bbox1, zorder=0, **asdict(zoom_effect_options.dest_connector_box_options))
-    bbox_patch2 = BboxPatch(bbox2, zorder=0, **asdict(zoom_effect_options.source_connector_box_options))
+    bbox_patch2 = BboxPatch(bbox2, zorder=100, **asdict(zoom_effect_options.source_connector_box_options))
+    # TODO workaround!
+    bbox_patch2_overlay = BboxPatch(
+        bbox2, zorder=101, fill=False, **asdict(ConnectorBoxOptions(alpha=1.0, facecolor=None))
+    )
 
     p = BboxConnectorPatch(
         bbox1,
@@ -98,7 +103,7 @@ def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, zoom_effect_options: 
         **asdict(zoom_effect_options.connector_patch_options),
     )
 
-    return c1, c2, bbox_patch1, bbox_patch2, p
+    return c1, c2, bbox_patch1, bbox_patch2, bbox_patch2_overlay, p
 
 
 def add_zoom_effect(ax1, ax2, zoom_effect_options: ZoomBoxEffectOptions):
@@ -116,12 +121,13 @@ def add_zoom_effect(ax1, ax2, zoom_effect_options: ZoomBoxEffectOptions):
     mybbox1 = ax1.bbox
     mybbox2 = TransformedBbox(ax1.viewLim, trans)
 
-    c1, c2, bbox_patch1, bbox_patch2, p = connect_bbox(
+    c1, c2, bbox_patch1, bbox_patch2, bbox_patch2_overlay, p = connect_bbox(
         mybbox1, mybbox2, loc1a=3, loc2a=2, loc1b=4, loc2b=1, zoom_effect_options=zoom_effect_options
     )
 
     ax1.add_patch(bbox_patch1)
     ax2.add_patch(bbox_patch2)
+    ax2.add_patch(bbox_patch2_overlay)
     ax2.add_patch(c1)
     ax2.add_patch(c2)
     ax2.add_patch(p)
@@ -142,6 +148,9 @@ def draw_zoom_line_plot(
         raise ValueError(
             f"The length of the x values has to be equal to the length of every plot data {x.size=}, data size={raw_plot_data[0].data.size}."
         )
+
+    if plot_options.locale is Locale.DE:
+        locale.setlocale(locale.LC_TIME, "de_DE")
 
     fig = fig if fig is not None else plt.figure(figsize=(12, 2.4 * len(raw_plot_data_rows)))
     mosaic_descr = [["main" for _ in range(len(zoom_boxes_options))]]
@@ -192,6 +201,9 @@ def draw_zoom_line_plot(
             # TODO workaround!
             zoom_box_options.effect_options.first_connector_options.alpha = 0.0 if row_idx != 0 else 1.0
             zoom_box_options.effect_options.second_connector_options.alpha = 0.0 if row_idx != 0 else 1.0
+            zoom_box_options.effect_options.source_connector_box_options.alpha = (
+                0.0 if row_idx != 0 else zoom_box_options.effect_options.dest_connector_box_options.alpha
+            )
 
             zoom_from = axs[f"{row_idx-1}{zoom_box_idx}"] if row_idx != 0 else ax_main
             add_zoom_effect(zoom_box, zoom_from, zoom_box_options.effect_options)
