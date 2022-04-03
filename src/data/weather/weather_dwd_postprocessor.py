@@ -24,10 +24,7 @@ def solar_irradiance_postprocessor(data: Series, df: DataFrame) -> Series:
 
 
 def diffuse_solar_irradiance_postprocessor(data: Series, df: DataFrame) -> Series:
-    print(f"{data.name=}")
-    df[data.name].values[:] = df[[data.name, WeatherDataColumns.GH_W_PER_M2]].min(axis=1).values
-    # data.replace(data, df[[data.name, WeatherDataColumns.GH_W_PER_M2]].min(axis=1))
-    # data[data.name].values = df[[data.name, WeatherDataColumns.GH_W_PER_M2]].min(axis=1).values
+    data.values[:] = df[[data.name, WeatherDataColumns.GH_W_PER_M2]].min(axis=1).values
     return solar_irradiance_postprocessor(data, df)
 
 
