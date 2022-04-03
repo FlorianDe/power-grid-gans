@@ -13,6 +13,7 @@ import pandas as pd
 
 import torch
 from torch import Tensor
+from experiments.experiments_utils.weather_data_translations import WEATHER_LABEL_MAP, WEATHER_UNIT_LATEX_MAP
 from src.data.weather.weather_dwd_importer import WeatherDataColumns
 
 from src.plots.typing import Locale, PlotData
@@ -292,19 +293,10 @@ def draw_weather_data_zoom_plot_sample(
 ):
     dates = np.array([d for d in interval_generator(start, end, delta=timedelta(hours=1))])
     plot_options: dict[WeatherDataColumns, any] = {
-        WeatherDataColumns.GH_W_PER_M2: {"zoom_plot_label": r"Globalstrahlung $\frac{W}{m^{2}}$"},
-        WeatherDataColumns.DH_W_PER_M2: {"zoom_plot_label": r"Diffusstrahlung $\frac{W}{m^{2}}$"},
-        WeatherDataColumns.WIND_DIR_DEGREE: {"zoom_plot_label": r"Windrichtung $^{\circ}$"},
-        WeatherDataColumns.WIND_DIR_DEGREE_DELTA: {"zoom_plot_label": r"Windrichtungsänderung $^{\circ}$"},
-        WeatherDataColumns.WIND_V_M_PER_S: {"zoom_plot_label": r"Windgeschwindigkeit $\frac{m}{s}$"},
-        WeatherDataColumns.T_AIR_DEGREE_CELSIUS: {"zoom_plot_label": r"Temperatur $^{\circ}C$"},
+        col: WEATHER_LABEL_MAP[col] + WEATHER_UNIT_LATEX_MAP[col] for col in [*cols_top, *cols_mid]
     }
-    plot_data_top = [
-        PlotData(data=dataframe[col].values, label=plot_options[col]["zoom_plot_label"]) for col in cols_top
-    ]
-    plot_data_mid = [
-        PlotData(data=dataframe[col].values, label=plot_options[col]["zoom_plot_label"]) for col in cols_mid
-    ]
+    plot_data_top = [PlotData(data=dataframe[col].values, label=plot_options[col]) for col in cols_top]
+    plot_data_mid = [PlotData(data=dataframe[col].values, label=plot_options[col]) for col in cols_mid]
     fig, axes = draw_zoom_line_plot(
         raw_plot_data_rows=[plot_data_mid, plot_data_top],
         x=dates,
