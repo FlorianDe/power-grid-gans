@@ -45,8 +45,9 @@ def _conf_set(y, alpha: float):
 
 
 def draw_ecdf_plot(
-        ecdfs: list[ECDFPlotData[StepFunction]],
-        plot_options: PlotOptions = PlotOptions('ECDF-Plot')
+    ecdfs: list[ECDFPlotData[StepFunction]],
+    plot: Optional[PlotResult] = None,
+    plot_options: PlotOptions = PlotOptions("ECDF-Plot"),
 ) -> PlotResult:
     # if confidence_alpha_alphas is None:
     #     confidence_alpha_alphas = np.repeat(0.5, len(ecdfs))
@@ -57,7 +58,7 @@ def draw_ecdf_plot(
     #     if len(ecdfs) is not len(confidence_alpha_alphas):
     #         raise ValueError("You have specified a different number of confidence alpha than the passed ecdf count.")
 
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+    fig, ax = plt.subplots(nrows=1, ncols=1) if plot is None else plot
     for idx in range(len(ecdfs)):
         ecdf = ecdfs[idx]
         x = ecdf.data.x
@@ -65,7 +66,11 @@ def draw_ecdf_plot(
         if ecdf.confidence_band_alpha != 0.0:
             lower, upper = _conf_set(y, ecdf.confidence_band_alpha)
             a = 1 - ecdf.confidence_band_alpha
-            conf_band_label = ecdf.confidence_band_label_supplier(a) if ecdf.confidence_band_label_supplier is not None else f"{a}% confidence band of {ecdf.label}"
+            conf_band_label = (
+                ecdf.confidence_band_label_supplier(a)
+                if ecdf.confidence_band_label_supplier is not None
+                else f"{a}% confidence band of {ecdf.label}"
+            )
             ax.fill_between(x, lower, upper, alpha=ecdf.confidence_band_fill_alpha, label=conf_band_label)
         ax.step(x, y, where="post", label=ecdf.label)
         # plt.step(x, lower, "r", where="post")
@@ -75,5 +80,9 @@ def draw_ecdf_plot(
     # ax.set_ylim(0, 1.05)
     # ax.vlines(x, 0, 0.05)
     ax.set_title(plot_options.title)
+    if plot_options.x_label:
+        ax.set_xlabel(plot_options.x_label)
+    if plot_options.y_label:
+        ax.set_ylabel(plot_options.y_label)
     ax.legend(loc="best")
     return PlotResult(fig, ax)
