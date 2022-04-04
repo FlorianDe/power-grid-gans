@@ -17,3 +17,7 @@ WEATHER_UNIT_LATEX_MAP: dict[WeatherDataColumns, str] = {
     WeatherDataColumns.WIND_V_M_PER_S: r"$\frac{m}{s}$",
     WeatherDataColumns.T_AIR_DEGREE_CELSIUS: r"$^{\circ}C$",
 }
+
+
+def get_weather_data_latex_label(col: WeatherDataColumns):
+    return WEATHER_LABEL_MAP[col] + " " + WEATHER_UNIT_LATEX_MAP[col]

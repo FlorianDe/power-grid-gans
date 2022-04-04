@@ -293,7 +293,7 @@ def draw_weather_data_zoom_plot_sample(
 ):
     dates = np.array([d for d in interval_generator(start, end, delta=timedelta(hours=1))])
     plot_options: dict[WeatherDataColumns, any] = {
-        col: WEATHER_LABEL_MAP[col] + WEATHER_UNIT_LATEX_MAP[col] for col in [*cols_top, *cols_mid]
+        col: WEATHER_LABEL_MAP[col] + " " + WEATHER_UNIT_LATEX_MAP[col] for col in [*cols_top, *cols_mid]
     }
     plot_data_top = [PlotData(data=dataframe[col].values, label=plot_options[col]) for col in cols_top]
     plot_data_mid = [PlotData(data=dataframe[col].values, label=plot_options[col]) for col in cols_mid]
