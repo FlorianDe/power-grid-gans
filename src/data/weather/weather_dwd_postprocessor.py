@@ -29,7 +29,7 @@ def diffuse_solar_irradiance_postprocessor(data: Series, df: DataFrame) -> Serie
 
 
 def wind_dir_postprocessing(data: Series, df: DataFrame) -> Series:
-    return wind_dir_cleansing(data)
+    return wind_dir_cleansing(data).div(10).round().mul(10)
 
 
 def clamp_temperature(data: Series, df: DataFrame) -> Series:
@@ -41,7 +41,7 @@ def clamp_temperature(data: Series, df: DataFrame) -> Series:
 def clamp_wind_speed(data: Series, df: DataFrame) -> Series:
     min_speed = 0
     max_speed = 60  # 60m/s equal to 216 km/h
-    return PandasProcessor(data).clip(min_speed, max_speed).run()
+    return PandasProcessor(data).abs().clip(min_speed, max_speed).run()
 
 
 DEFAULT_DWD_WEATHER_PROCESSOR_OPTIONS: dict[WeatherDataColumns, ColumnProcessorOptions] = {
@@ -76,7 +76,7 @@ class DWDWeatherPostProcessor:
         for column, options in self.processor_options.items():
             if column in df.columns:
                 if options.post_processor is not None:
-                    print(f"Applying post processor on {column}")
+                    # print(f"Applying post processor on {column}")
                     df[column] = options.post_processor(df[column], df)
 
     def apply(self, df: DataFrame):
