@@ -8,6 +8,11 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 
 from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
+from experiments.experiments_utils.weather_data_translations import (
+    WEATHER_LABEL_MAP,
+    WEATHER_UNIT_LATEX_MAP,
+    get_weather_data_latex_label,
+)
 
 from src.data.distribution.distribution_fit import DistributionFit
 from src.data.weather.weather_dwd_importer import (
@@ -101,22 +106,23 @@ def explore_data_distributions(options: DistributionFitOptions):
     # extract all used targetColumns
 
     exclude_night_time_values = create_night_time_replace_handler()
+
     target_column_extra_info: dict[str, list[DistributionPlotColumn]] = {
         WeatherDataColumns.T_AIR_DEGREE_CELSIUS: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Temperatur in $^{\circ}C$"),
+                plot_options=PlotOptions(x_label=get_weather_data_latex_label(WeatherDataColumns.T_AIR_DEGREE_CELSIUS)),
                 extra_dist_plots=["norm", "gennorm"],
-                legend_spacing=True,
+                legend_spacing=(0.0, 0.08),
             )
         ],
         WeatherDataColumns.DH_W_PER_M2: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Stundensumme der diffusen Solarstrahlung in $\frac{W}{m^2}$"),
+                plot_options=PlotOptions(x_label=get_weather_data_latex_label(WeatherDataColumns.DH_W_PER_M2)),
                 extra_dist_plots=[],
             ),
             DistributionPlotColumn(
                 plot_options=PlotOptions(
-                    x_label=r"Stundensumme der diffusen Solarstrahlung in $\frac{W}{m^2}$ (lichter Tag)."
+                    x_label=get_weather_data_latex_label(WeatherDataColumns.DH_W_PER_M2) + " (lichter Tag)."
                 ),
                 extra_dist_plots=["weibull_min", "beta"],
                 transformer=lambda x: exclude_night_time_values(x),
@@ -124,37 +130,41 @@ def explore_data_distributions(options: DistributionFitOptions):
         ],
         WeatherDataColumns.GH_W_PER_M2: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Stundensumme der Globalstrahlung in $\frac{W}{m^2}$"),
+                plot_options=PlotOptions(x_label=get_weather_data_latex_label(WeatherDataColumns.GH_W_PER_M2)),
                 extra_dist_plots=[],
             ),
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Stundensumme der Globalstrahlung in $\frac{W}{m^2}$ (lichter Tag)."),
+                plot_options=PlotOptions(
+                    x_label=get_weather_data_latex_label(WeatherDataColumns.GH_W_PER_M2) + " (lichter Tag)."
+                ),
                 transformer=lambda x: exclude_night_time_values(x),
                 extra_dist_plots=["weibull_min", "beta"],
             ),
         ],
         WeatherDataColumns.WIND_V_M_PER_S: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Windgeschwindigkeit in $\frac{m}{s}$"),
+                plot_options=PlotOptions(x_label=get_weather_data_latex_label(WeatherDataColumns.WIND_V_M_PER_S)),
                 extra_dist_plots=["rayleigh"],
+                legend_spacing=(0.0, 0.08),
             )
         ],
         WeatherDataColumns.WIND_DIR_DEGREE: [
             DistributionPlotColumn(
-                plot_options=PlotOptions(x_label=r"Windrichtung in Grad $[0^{\circ}, 350^{\circ}]$"),
+                plot_options=PlotOptions(x_label=get_weather_data_latex_label(WeatherDataColumns.WIND_DIR_DEGREE)),
                 extra_dist_plots=["uniform", "random"],
                 bins=36,  # Since 360 degree and only in steps*10
-                legend_spacing=True,
+                legend_spacing=(0.0, 0.08),
             )
         ],
         WeatherDataColumns.WIND_DIR_DEGREE_DELTA: [
             DistributionPlotColumn(
                 plot_options=PlotOptions(
-                    x_label=r"Windrichtungsänderung in Grad pro Stunde $[-180^{\circ}, 180^{\circ}]$"
+                    x_label=get_weather_data_latex_label(WeatherDataColumns.WIND_DIR_DEGREE_DELTA)
+                    + r" pro Stunde $[-180^{\circ}, 180^{\circ}]$"
                 ),
                 extra_dist_plots=["norm"],
                 bins=36,  # Since 360 degree and only in steps*10
-                legend_spacing=True,
+                legend_spacing=(0.0, 0.08),
             )
         ],
         WeatherDataColumns.CLOUD_PERCENT: [
@@ -188,8 +198,10 @@ def explore_data_distributions(options: DistributionFitOptions):
         for idx, column_plot_metadata in enumerate(column_plot_metadata_entries):
             if column_plot_metadata.transformer is not None:
                 data = column_plot_metadata.transformer(data)
-            margin = 0.5
-            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.4 + margin, 4.8 + margin))
+            scale = 0.75
+            margin_x = 0.5
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(scale * 6.4 + margin_x / scale, scale * 4.8))
+            # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.4 + margin, 4.8 + margin))
             fit_res = draw_best_fit_plot(
                 data=data,
                 plot_metadata=column_plot_metadata,
