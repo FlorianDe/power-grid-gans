@@ -4,16 +4,16 @@ from matplotlib import pyplot as plt
 from numpy.typing import ArrayLike
 from statsmodels.tsa.seasonal import seasonal_decompose, STL, DecomposeResult
 
-from src.plots.timeseries_plot import draw_timeseries_plot
+from src.plots.timeseries_decomposition_plot import draw_timeseries_decomposition_plot
 from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
 
 
 def __decompose_sine(seed: int = 0) -> DecomposeResult:
     np.random.seed(seed)
     n = 1500
-    dates = np.array('2005-01-01', dtype=np.datetime64) + np.arange(n)
+    dates = np.array("2005-01-01", dtype=np.datetime64) + np.arange(n)
     data = 12 * np.sin(2 * np.pi * np.arange(n) / 365) + np.random.normal(12, 2, 1500)
-    df = pd.DataFrame({'data': data}, index=dates)
+    df = pd.DataFrame({"data": data}, index=dates)
 
     return STL(df, period=365).fit()
     # return seasonal_decompose(df, model='additive', period=365)
@@ -30,7 +30,7 @@ def decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> D
     :return: The time series decomposition result including: trend, seasonal, resid, observed
     """
 
-    result = seasonal_decompose(data, model='additive', period=period)
+    result = seasonal_decompose(data, model="additive", period=period)
     # print(result.trend)
     # print(result.seasonal)
     # print(result.resid)
@@ -39,7 +39,7 @@ def decompose_weather_data(data: ArrayLike, period: int = int(24 * 365.25)) -> D
     return result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # importer = DWDWeatherDataImporter()
     # importer.initialize()
     # data = importer.data['t_air_degree_celsius']
@@ -51,8 +51,6 @@ if __name__ == '__main__':
     #     decompose_weather_data(importer.data[key]).plot()
 
     decomp_res = __decompose_sine()
-    draw_timeseries_plot(decomp_res, figsize=(6.4, 6.4)).show()
+    draw_timeseries_decomposition_plot(decomp_res, figsize=(6.4, 6.4)).show()
     # res.plot()
     # plt.show()
-
-

@@ -18,27 +18,21 @@ class DecomposeResultColumns(Enum):
 
 
 __PLOT_DICT: dict[DecomposeResultColumns, dict[Locale, str]] = {
-    DecomposeResultColumns.OBSERVED: {
-        Locale.EN: "Observed",
-        Locale.DE: "Beobachtung"
-    },
-    DecomposeResultColumns.SEASONAL: {
-        Locale.EN: "Seasonal",
-        Locale.DE: "Saisonal"
-    },
-    DecomposeResultColumns.TREND: {
-        Locale.EN: "Trend",
-        Locale.DE: "Trend"
-    },
-    DecomposeResultColumns.RESID: {
-        Locale.EN: "Residuals",
-        Locale.DE: "Rest"
-    },
-    DecomposeResultColumns.WEIGHTS: {
-        Locale.EN: "Weights",
-        Locale.DE: "Gewichte"
-    },
+    DecomposeResultColumns.OBSERVED: {Locale.EN: "Observed", Locale.DE: "Beobachtung"},
+    DecomposeResultColumns.SEASONAL: {Locale.EN: "Seasonal", Locale.DE: "Saisonal"},
+    DecomposeResultColumns.TREND: {Locale.EN: "Trend", Locale.DE: "Trend"},
+    DecomposeResultColumns.RESID: {Locale.EN: "Residuals", Locale.DE: "Rest"},
+    DecomposeResultColumns.WEIGHTS: {Locale.EN: "Weights", Locale.DE: "Gewichte"},
 }
+
+GERMAN_LATEX_TRANSLATIONS = {
+    DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{Daten}\;Y_t}$",
+    DecomposeResultColumns.SEASONAL: r"$\displaystyle{\text{Saisonal}\;S_t}$",
+    DecomposeResultColumns.TREND: r"$\displaystyle{\text{Trend}\;T_t}$",
+    DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
+    DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
+}
+
 
 @dataclass
 class DecomposePlotOptions:
@@ -58,6 +52,7 @@ class DecomposePlotOptions:
     weights : bool
         Include the weights in the plot (if any)
     """
+
     observed: bool = True
     seasonal: bool = True
     trend: bool = True
@@ -65,12 +60,13 @@ class DecomposePlotOptions:
     weights: bool = False
 
 
-def draw_timeseries_plot(
-        data: DecomposeResult,
-        plot_options: PlotOptions = PlotOptions(),
-        translations: dict[DecomposeResultColumns, str] = None,
-        decompose_plot_options: DecomposePlotOptions = DecomposePlotOptions(),
-        figsize: tuple[float, float] = (6.4, 4.8)
+def draw_timeseries_decomposition_plot(
+    data: DecomposeResult,
+    plot_options: PlotOptions = PlotOptions(),
+    translations: dict[DecomposeResultColumns, str] = None,
+    decompose_plot_options: DecomposePlotOptions = DecomposePlotOptions(),
+    rasterized: bool = False,
+    figsize: tuple[float, float] = (6.4, 4.8),
 ) -> PlotResult:
     def translate(key: DecomposeResultColumns) -> str:
         return translations[key] if translations is not None else __PLOT_DICT[key][plot_options.locale]
@@ -90,18 +86,33 @@ def draw_timeseries_plot(
 
     fig, axs = plt.subplots(nrows=len(series), ncols=1, figsize=figsize)
     for i, (ax, (series, column)) in enumerate(zip(axs, series)):
+        # if rasterized:
+        # ax.set_axisbelow(True)
+        ax.grid(True, axis="both", linestyle="-")
+        # ax.set_rasterization_zorder(0)
+
         if column != DecomposeResultColumns.RESID:
-            ax.plot(series)
+            ax.plot(series, zorder=10, rasterized=rasterized)
         else:
-            ax.plot(series, marker='o', linestyle='none')
-            ax.plot(xlim, (0, 0), color='#000000', zorder=-3)
+            ax.plot(
+                series,
+                marker="o",
+                markersize=0.5 * plt.rcParams["lines.markersize"],
+                linestyle="none",
+                zorder=10,
+                rasterized=rasterized,
+            )
+            # ax.plot(series, zorder=10, rasterized=rasterized)
+            ax.plot(xlim, (0, 0), color="#000000", zorder=10, rasterized=rasterized)
         name = translate(column)
         if i == 0 and decompose_plot_options.observed:
             ax.set_title(name)
         else:
             ax.set_ylabel(name)
         ax.set_xlim(xlim)
+        ax.tick_params(axis="x", labelrotation=30)
 
+    fig.align_ylabels(axs)
     fig.tight_layout()
 
     return PlotResult(fig, axs)

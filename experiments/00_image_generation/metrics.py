@@ -15,7 +15,7 @@ from src.metrics.kolmogorov_smirnov import ks2_test, ks2_critical_value
 from src.metrics.kullback_leibler import kl_divergence, __calculate_kl_divergence_terms
 from src.plots.histogram_plot import draw_hist_plot, HistPlotData
 from src.plots.qq_plot import draw_qq_plot, QQReferenceLine
-from src.plots.timeseries_plot import draw_timeseries_plot, DecomposeResultColumns
+from src.plots.timeseries_decomposition_plot import draw_timeseries_decomposition_plot, DecomposeResultColumns
 from src.plots.typing import PlotResult, PlotOptions, PlotData
 from src.utils.math_utils import LinearIntervalScaler
 
@@ -232,7 +232,7 @@ def save_timeseries_plot() -> PlotResult:
         DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
         DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
     }
-    res = draw_timeseries_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
+    res = draw_timeseries_decomposition_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
 
     return res
 
