@@ -15,6 +15,8 @@ from matplotlib import pyplot as plt
 import torch
 from scipy.stats import median_test
 from statsmodels.distributions import ECDF
+from statsmodels.tsa.seasonal import seasonal_decompose
+
 from experiments.experiments_utils.utils import get_experiments_folder, set_latex_plot_params
 
 from experiments.experiments_utils.plotting import (
@@ -37,6 +39,11 @@ from src.metrics.kolmogorov_smirnov import ks2_critical_value, ks2_test
 from src.metrics.wasserstein_distance import wasserstein_dist
 from src.plots.ecdf_plot import ECDFPlotData, draw_ecdf_plot
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
+from src.plots.timeseries_decomposition_plot import (
+    GERMAN_LATEX_TRANSLATIONS,
+    DecomposeResultColumns,
+    draw_timeseries_decomposition_plot,
+)
 from src.plots.typing import PlotData, PlotOptions, PlotResult
 
 from src.plots.zoom_line_plot import ConnectorBoxOptions, ZoomBoxEffectOptions, ZoomPlotOptions, draw_zoom_line_plot
@@ -53,6 +60,20 @@ DEFAULT_FILE_ENDING = "pdf"
 def save_hist_plots_on_every_feature(
     evaluator: Evaluator, path: PurePath, result_path: PurePath, epoch: int, plot_file_ending=DEFAULT_FILE_ENDING
 ):
+    def __draw_timeseries_decomposition_plot(series: pd.Series, col: WeatherDataColumns):
+        year_period = 8766
+        size = 0.65 * 6.4
+        figsize = (size, size)
+        decomp_result_year_only = seasonal_decompose(series, model="additive", period=year_period)
+        translations = {
+            **GERMAN_LATEX_TRANSLATIONS,
+            DecomposeResultColumns.OBSERVED: r"$\displaystyle{\text{" + WEATHER_LABEL_MAP[col] + r"}\;Y_t}$",
+        }
+        plot_res = draw_timeseries_decomposition_plot(
+            data=decomp_result_year_only, translations=translations, figsize=figsize, rasterized=True
+        )
+        return plot_res.fig, plot_res.ax
+
     def __draw_single_hist_plot(
         sample_a: npt.ArrayLike, sample_b: npt.ArrayLike, col: WeatherDataColumns, plot: Optional[PlotResult] = None
     ):
@@ -104,7 +125,9 @@ def save_hist_plots_on_every_feature(
     importer = DWDWeatherDataImporter(start_date=start, end_date=end)
     importer.initialize()
     # for epoch in range(1000, 1050, 10):
-    raw_dataframe = evaluator.generate_dataframe(start, end)
+    start_generator = datetime.fromisoformat("2020-01-01T00:00:00")
+    end_generator = datetime.fromisoformat("2030-12-31T23:00:00")
+    raw_dataframe = evaluator.generate_dataframe(start_generator, end_generator)
     dataframe = weather_post_processor(raw_dataframe)
     exclude_night_time_values = create_night_time_replace_handler()
     special_hist_plot_column_options: dict[WeatherDataColumns, dict[str, any]] = {
@@ -142,6 +165,8 @@ def save_hist_plots_on_every_feature(
     raw_hist_result_path.mkdir(parents=True, exist_ok=True)
     ecdf_result_path = result_path / "ecdf"
     ecdf_result_path.mkdir(parents=True, exist_ok=True)
+    decomp_result_path = result_path / "decomp"
+    decomp_result_path.mkdir(parents=True, exist_ok=True)
 
     for col in dataframe.columns:
         sample_a = dataframe[col].values
@@ -171,6 +196,12 @@ def save_hist_plots_on_every_feature(
             ecdf_fig, _ = __draw_single_ecdf_plot(sample_a=sample_a, sample_b=sample_b, col=col)
             ecdf_fig.savefig(
                 ecdf_result_path / f"ecdf_plot_data_comparison_{col}_{epoch}.{plot_file_ending}",
+                bbox_inches="tight",
+                pad_inches=0,
+            )
+            decomp_fig, _ = __draw_timeseries_decomposition_plot(series=dataframe[col], col=col)
+            decomp_fig.savefig(
+                decomp_result_path / f"decomp_plot_{col}_{epoch}.{plot_file_ending}",
                 bbox_inches="tight",
                 pad_inches=0,
             )
@@ -320,7 +351,8 @@ def eval(path: PurePath, epoch: int):
     evaluator = Evaluator.load(model_path)
 
     save_sample_zoom_line_plot(evaluator=evaluator, result_path=result_path, epoch=epoch)
-    save_hist_plots_on_every_feature(evaluator=evaluator, path=path, result_path=result_path, epoch=epoch)
+    with sns.axes_style("darkgrid"):
+        save_hist_plots_on_every_feature(evaluator=evaluator, path=path, result_path=result_path, epoch=epoch)
     # ks_test_on_every_feature(evaluator=evaluator)
 
 
