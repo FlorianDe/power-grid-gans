@@ -1,5 +1,7 @@
+from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
@@ -13,7 +15,9 @@ https://github.com/jsyoon0823/TimeGAN/blob/master/metrics/visualization_metrics.
 
 
 # TODO MOVE TO PLOTS
-def visualization(ori_data, generated_data, analysis) -> PlotResult:
+def dimension_reduction_visualization(
+    ori_data: npt.ArrayLike, generated_data: npt.ArrayLike, analysis: Literal["pca", "tsne"]
+) -> PlotResult:
     """Using PCA or tSNE for generated and original data visualization.
 
     Args:
@@ -30,25 +34,37 @@ def visualization(ori_data, generated_data, analysis) -> PlotResult:
     # Plotting
     fig, ax = plt.subplots(1)
 
-    if analysis == 'pca':
+    if analysis == "pca":
         # PCA Analysis
+        print(f"{prep_data.shape=}")
+        print(f"{prep_data_hat.shape=}")
         pca = PCA(n_components=2)
         pca.fit(prep_data)
         pca_results = pca.transform(prep_data)
         pca_hat_results = pca.transform(prep_data_hat)
 
-        plt.scatter(pca_results[:, 0], pca_results[:, 1],
-                    c=colors[:anal_sample_no], alpha=0.2, label="Original")
-        plt.scatter(pca_hat_results[:, 0], pca_hat_results[:, 1],
-                    c=colors[anal_sample_no:], alpha=0.2, label="Synthetic")
+        plt.scatter(
+            pca_results[:anal_sample_no, 0],
+            pca_results[:anal_sample_no, 1],
+            c=colors[:anal_sample_no],
+            alpha=0.2,
+            label="Original",
+        )
+        plt.scatter(
+            pca_hat_results[:anal_sample_no, 0],
+            pca_hat_results[:anal_sample_no, 1],
+            c=colors[anal_sample_no:],
+            alpha=0.2,
+            label="Synthetic",
+        )
 
         ax.legend()
-        ax.set_title('PCA plot')
-        ax.set_xlabel('x-pca')
-        ax.set_ylabel('y_pca')
+        ax.set_title("PCA plot")
+        ax.set_xlabel("xpca")
+        ax.set_ylabel("ypca")
         return PlotResult(fig, ax)
 
-    elif analysis == 'tsne':
+    elif analysis == "tsne":
 
         # Do t-SNE Analysis together
         # prep_data_final = np.concatenate((prep_data, prep_data_hat), axis=0)
@@ -58,21 +74,31 @@ def visualization(ori_data, generated_data, analysis) -> PlotResult:
         tsne_results = tsne.fit_transform(prep_data)
         tsne_results_hat = tsne.fit_transform(prep_data_hat)
 
-        plt.scatter(tsne_results[:anal_sample_no, 0], tsne_results[:anal_sample_no, 1],
-                    c=colors[:anal_sample_no], alpha=0.2, label="Original")
-        plt.scatter(tsne_results_hat[:anal_sample_no, 0], tsne_results_hat[:anal_sample_no, 1],
-                    c=colors[anal_sample_no:], alpha=0.2, label="Synthetic")
+        plt.scatter(
+            tsne_results[:anal_sample_no, 0],
+            tsne_results[:anal_sample_no, 1],
+            c=colors[:anal_sample_no],
+            alpha=0.2,
+            label="Original",
+        )
+        plt.scatter(
+            tsne_results_hat[:anal_sample_no, 0],
+            tsne_results_hat[:anal_sample_no, 1],
+            c=colors[anal_sample_no:],
+            alpha=0.2,
+            label="Synthetic",
+        )
 
         ax.legend()
 
-        ax.set_title('t-SNE plot')
-        ax.set_xlabel('x-tsne')
-        ax.set_ylabel('y_tsne')
+        ax.set_title("tSNE plot")
+        ax.set_xlabel("xtsne")
+        ax.set_ylabel("ytsne")
 
         return PlotResult(fig, ax)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ori = np.random.rand(20, 6) * 100
     gen = ori + np.random.rand(20, 6) * 5
     snn = StandardNumpyNormalizer()
@@ -83,5 +109,5 @@ if __name__ == '__main__':
     snn.fit(gen)
     gen = snn.normalize(gen)
     # visualization(ori, gen, 'pca')
-    res = visualization(ori, gen, 'tsne')
+    res = dimension_reduction_visualization(ori, gen, "tsne")
     res.show()
