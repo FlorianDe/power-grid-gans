@@ -36,9 +36,11 @@ from src.evaluator.evaluator import Evaluator
 
 from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 from src.metrics.kolmogorov_smirnov import ks2_critical_value, ks2_test
+from src.metrics.pca import dimension_reduction_visualization
 from src.metrics.wasserstein_distance import wasserstein_dist
 from src.plots.ecdf_plot import ECDFPlotData, draw_ecdf_plot
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
+from src.plots.qq_plot import QQReferenceLine, draw_qq_plot
 from src.plots.timeseries_decomposition_plot import (
     GERMAN_LATEX_TRANSLATIONS,
     DecomposeResultColumns,
@@ -60,6 +62,62 @@ DEFAULT_FILE_ENDING = "pdf"
 def save_hist_plots_on_every_feature(
     evaluator: Evaluator, path: PurePath, result_path: PurePath, epoch: int, plot_file_ending=DEFAULT_FILE_ENDING
 ):
+    def __draw_violin_plot_every_hour(
+        sample_a: pd.Series, sample_b: pd.Series, col: WeatherDataColumns, plot: Optional[PlotResult] = None
+    ):
+        scale = 1.5
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(scale * 5, scale * 1)) if plot is None else plot
+        sequence_len = 24
+        sample_a_len = len(sample_a.index)
+        sample_b_len = len(sample_b.index)
+        if sample_a_len % sequence_len != 0 or sample_b_len % sequence_len != 0:
+            raise ValueError(f"The samples have to have be divisible by ${sequence_len} without a remainder.")
+
+        gen_col_type = np.repeat("Generatorausgabe", sample_a_len)
+        theoretical_col_type = np.repeat("Trainingsdaten", sample_b_len)
+        # hour_values = np.arange(sequence_len)
+        # hours = np.tile(hour_values, (sample_a_len + sample_b_len) // sequence_len)
+        sample_a_hours = np.mod((sample_a.index.hour.values + 1), sequence_len)
+        sample_b_hours = np.mod((sample_b.index.hour.values + 1), sequence_len)
+        tips = pd.DataFrame(
+            {
+                "hour": np.concatenate([sample_a_hours, sample_b_hours]),
+                "type": np.concatenate([gen_col_type, theoretical_col_type]),
+                "values": np.concatenate([sample_a, sample_b]),
+            }
+        )
+        ax = sns.violinplot(x="hour", y="values", hue="type", data=tips, split=True, linewidth=0.75, ax=ax)
+        # Remove crappy legend title hack with labels...
+        # handles, labels = ax.get_legend_handles_labels()
+        # ax.legend(handles=handles[1:], labels=labels[1:])
+        # ax.legend(loc="best")
+        ax.legend().set_visible(False)
+        ax.set_xlabel(r"$[t]_{s}$")
+        ax.set_ylabel(get_weather_data_latex_label(col))
+
+        return fig, ax
+
+    def __draw_qq_plot(
+        sample_a: npt.ArrayLike, sample_b: npt.ArrayLike, col: WeatherDataColumns, plot: Optional[PlotResult] = None
+    ):
+        plot_res = draw_qq_plot(
+            PlotData(data=sample_a, label="Generatorausgabe"),
+            PlotData(data=sample_b, label="Trainingsdaten"),
+            1000,
+            {
+                QQReferenceLine.THEORETICAL_LINE,
+                # QQReferenceLine.FIRST_THIRD_QUARTIL,
+                # QQReferenceLine.LEAST_SQUARES_REGRESSION,
+            },
+            [0.25, 0.5, 0.75],
+            plot_options=PlotOptions(
+                title=get_weather_data_latex_label(col)
+                # x_label=get_weather_data_latex_label(col), y_label=r"Relative Häufigkeitsdichte $P(x)$"
+            ),
+            plot=plot,
+        )
+        return plot_res.fig, plot_res.ax
+
     def __draw_timeseries_decomposition_plot(series: pd.Series, col: WeatherDataColumns):
         year_period = 8766
         size = 0.65 * 6.4
@@ -140,24 +198,22 @@ def save_hist_plots_on_every_feature(
     evaluator = Evaluator.load(model_path)
 
     # Can be used to create a multi grid figure to display all at once! Just pass plot=PlotResult(hist_fig, hist_axes[col] into the draw methods
-    # def create_mosaic_figure() -> tuple[Figure, Axes]:
-    #     fig = plt.figure(figsize=(6.4 * 3, 4.8 * 2))  # figsize=(12, 2.4 * len(raw_plot_data_rows)))
-    #     axs = fig.subplot_mosaic(
-    #         [
-    #             [
-    #                 WeatherDataColumns.WIND_DIR_DEGREE,
-    #                 WeatherDataColumns.WIND_V_M_PER_S,
-    #                 WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
-    #             ],
-    #             [WeatherDataColumns.GH_W_PER_M2, WeatherDataColumns.DH_W_PER_M2, WeatherDataColumns.DH_W_PER_M2],
-    #         ],
-    #     )
-    #     return fig, axs
+    def create_mosaic_figure() -> tuple[Figure, Axes]:
+        fig = plt.figure(figsize=(6.4 * 3, 4.8 * 2))  # figsize=(12, 2.4 * len(raw_plot_data_rows)))
+        axs = fig.subplot_mosaic(
+            [
+                [
+                    WeatherDataColumns.WIND_DIR_DEGREE,
+                    WeatherDataColumns.WIND_V_M_PER_S,
+                    WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+                ],
+                [WeatherDataColumns.GH_W_PER_M2, WeatherDataColumns.DH_W_PER_M2, WeatherDataColumns.DH_W_PER_M2],
+            ],
+        )
+        return fig, axs
 
-    # hist_fig, hist_axes = create_mosaic_figure()
-    # ecdf_fig, ecdf_axes = create_mosaic_figure()
-    # hist_fig.suptitle(str(epoch))
-    # ecdf_fig.suptitle(str(epoch))
+    multi_fig, multi_axes = create_mosaic_figure()
+    multi_fig.suptitle(str(epoch))
 
     hist_result_path = result_path / "hist"
     hist_result_path.mkdir(parents=True, exist_ok=True)
@@ -167,44 +223,63 @@ def save_hist_plots_on_every_feature(
     ecdf_result_path.mkdir(parents=True, exist_ok=True)
     decomp_result_path = result_path / "decomp"
     decomp_result_path.mkdir(parents=True, exist_ok=True)
+    violin_result_path = result_path / "violin"
+    violin_result_path.mkdir(parents=True, exist_ok=True)
+    qq_result_path = result_path / "qq_plot"
+    qq_result_path.mkdir(parents=True, exist_ok=True)
 
     for col in dataframe.columns:
-        sample_a = dataframe[col].values
-        sample_b = importer.data[col].values
+        sample_a = dataframe[col]
+        sample_b = importer.data[col]
         col_hist_options = special_hist_plot_column_options.get(col, {})
         print(f"{col=}, {col_hist_options}")
         if col_hist_options is not None:
             transformer = col_hist_options.get("transformer")
             if transformer is not None:
-                sample_a = transformer(dataframe[col]).values
-                sample_b = transformer(importer.data[col]).values
-            raw_hist_fig, _ = __draw_single_hist_plot(
-                sample_a=raw_dataframe[col].values, sample_b=importer.data[col].values, col=col
-            )
-            raw_hist_fig.savefig(
-                raw_hist_result_path
-                / f"hist_plot_data_comparison_{col}_{epoch}_before_post_processing.{plot_file_ending}",
+                sample_a = transformer(dataframe[col])
+                sample_b = transformer(importer.data[col])
+
+            # raw_hist_fig, _ = __draw_single_hist_plot(
+            #     sample_a=raw_dataframe[col].values, sample_b=importer.data[col].values, col=col
+            # )
+            # raw_hist_fig.savefig(
+            #     raw_hist_result_path
+            #     / f"hist_plot_data_comparison_{col}_{epoch}_before_post_processing.{plot_file_ending}",
+            #     bbox_inches="tight",
+            #     pad_inches=0,
+            # )
+            # hist_fig, _ = __draw_single_hist_plot(sample_a=sample_a.values, sample_b=sample_b.values, col=col)
+            # hist_fig.savefig(
+            #     hist_result_path / f"hist_plot_data_comparison_{col}_{epoch}.{plot_file_ending}",
+            #     bbox_inches="tight",
+            #     pad_inches=0,
+            # )
+            # ecdf_fig, _ = __draw_single_ecdf_plot(sample_a=sample_a.values, sample_b=sample_b.values, col=col)
+            # ecdf_fig.savefig(
+            #     ecdf_result_path / f"ecdf_plot_data_comparison_{col}_{epoch}.{plot_file_ending}",
+            #     bbox_inches="tight",
+            #     pad_inches=0,
+            # )
+            # decomp_fig, _ = __draw_timeseries_decomposition_plot(series=dataframe[col], col=col)
+            # decomp_fig.savefig(
+            #     decomp_result_path / f"decomp_plot_{col}_{epoch}.{plot_file_ending}",
+            #     bbox_inches="tight",
+            #     pad_inches=0,
+            # )
+            violin_fig, _ = __draw_violin_plot_every_hour(sample_a=sample_a, sample_b=sample_b, col=col)
+            violin_fig.savefig(
+                violin_result_path / f"violin_plot_hourly_{col}_{epoch}.{plot_file_ending}",
                 bbox_inches="tight",
                 pad_inches=0,
             )
-            hist_fig, _ = __draw_single_hist_plot(sample_a=sample_a, sample_b=sample_b, col=col)
-            hist_fig.savefig(
-                hist_result_path / f"hist_plot_data_comparison_{col}_{epoch}.{plot_file_ending}",
-                bbox_inches="tight",
-                pad_inches=0,
-            )
-            ecdf_fig, _ = __draw_single_ecdf_plot(sample_a=sample_a, sample_b=sample_b, col=col)
-            ecdf_fig.savefig(
-                ecdf_result_path / f"ecdf_plot_data_comparison_{col}_{epoch}.{plot_file_ending}",
-                bbox_inches="tight",
-                pad_inches=0,
-            )
-            decomp_fig, _ = __draw_timeseries_decomposition_plot(series=dataframe[col], col=col)
-            decomp_fig.savefig(
-                decomp_result_path / f"decomp_plot_{col}_{epoch}.{plot_file_ending}",
-                bbox_inches="tight",
-                pad_inches=0,
-            )
+            # qq_fig, _ = __draw_qq_plot(
+            #     sample_a=sample_a, sample_b=sample_b, col=col, plot=PlotResult(multi_fig, multi_axes[col])
+            # )
+            # qq_fig.savefig(
+            #     qq_result_path / f"qq_plot_{col}_{epoch}.{plot_file_ending}",
+            #     bbox_inches="tight",
+            #     pad_inches=0,
+            # )
 
 
 def ks_test_on_every_feature(evaluator: Evaluator):
