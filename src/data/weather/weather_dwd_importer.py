@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Callable, Optional, Final, Union
+from typing import Callable, Optional, Final, Union
 
 import numpy as np
 import pandas as pd
@@ -60,14 +60,14 @@ class ColumnMapping:
     sourceColumn: str
     targetColumn: str
     unitFactor: float = 1.0  # unit transformation factor
-    extraMappings: List[ExtraCalculatedMapping] = field(default_factory=list)
+    extraMappings: list[ExtraCalculatedMapping] = field(default_factory=list)
     dataPreprocessing: Optional[Callable[[DataFrame], DataFrame]] = None
 
 
 @dataclass
 class WeatherDataSet:
     fileUrlPath: str
-    columns: List[ColumnMapping]
+    columns: list[ColumnMapping]
     fileSuffix: str = ".zip"
     dateTimeParser: Callable[[str], datetime] = lambda date: datetime.strptime(date, DATE_TIME_FORMAT)
 
