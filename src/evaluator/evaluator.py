@@ -39,7 +39,7 @@ class Evaluator:
         self.device = device
         self.model.eval()  # Set the model to "eval" mode, alias for model.train(mode=False)
 
-    def eval(self, z: torch.tensor, c: Optional[torch.tensor]):
+    def eval(self, z: torch.tensor, c: Optional[torch.tensor]) -> Tensor:
         with torch.no_grad():
             y = self.model(z) if c is None else self.model(z, c)
             # reshape, generator should know this

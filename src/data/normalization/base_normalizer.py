@@ -4,12 +4,12 @@ import abc
 import json
 from typing import Generic, TypeVar
 
-import numpy
+import numpy.typing as npt
 import torch
 
 from src.data.serializer.class_serializer import ClassSerializer
 
-T = TypeVar("T", type(torch.tensor), type(numpy.array))
+T = TypeVar("T", type(torch.Tensor), type(npt.ArrayLike))
 
 
 class BaseNormalizer(Generic[T]):
@@ -25,7 +25,9 @@ class BaseNormalizer(Generic[T]):
 
     def check_fitted(self) -> None:
         if not self.is_fitted():
-            raise AssertionError("The normalizer has to be fitted against some kind of data, before it can be used to re/normalize data.")
+            raise AssertionError(
+                "The normalizer has to be fitted against some kind of data, before it can be used to re/normalize data."
+            )
 
     @abc.abstractmethod
     def fit(self, data: T) -> None:
@@ -44,4 +46,4 @@ class BaseNormalizer(Generic[T]):
         raise NotImplementedError("Please Implement this method")
 
     def __str__(self) -> str:
-        return f'Instance of {self.__module__}.{self.__class__.__name__} with state: {json.dumps(self.__dict__, indent=4, sort_keys=True, default=str)}'
+        return f"Instance of {self.__module__}.{self.__class__.__name__} with state: {json.dumps(self.__dict__, indent=4, sort_keys=True, default=str)}"
