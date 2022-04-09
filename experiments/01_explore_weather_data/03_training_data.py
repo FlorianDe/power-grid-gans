@@ -19,7 +19,7 @@ from statsmodels.tsa.seasonal import STL, seasonal_decompose
 
 def save_fig(fig, path):
     fig.canvas.draw()
-    fig.savefig(path, bbox_inches="tight", pad_inches=0)
+    fig.savefig(path, bbox_inches="tight", pad_inches=0, dpi=200)
     plt.close(fig)
 
 
@@ -59,7 +59,8 @@ if __name__ == "__main__":
     decomp_save_path.mkdir(parents=True, exist_ok=True)
     print(f"Normal decomposition")
     size = 0.65 * 6.4
-    figsize = (size, size)
+    ratio = 1.25
+    figsize = (ratio * size, size / ratio)
     for (column_name, values_normalized) in zip(data_importer.data, data_holder.data):
         print(f"Calculation decomposition for {column_name}")
 

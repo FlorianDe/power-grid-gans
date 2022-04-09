@@ -110,7 +110,7 @@ def draw_timeseries_decomposition_plot(
         else:
             ax.set_ylabel(name)
         ax.set_xlim(xlim)
-        ax.tick_params(axis="x", labelrotation=30)
+        # ax.tick_params(axis="x", labelrotation=30)
 
     fig.align_ylabels(axs)
     fig.tight_layout()
