@@ -114,7 +114,7 @@ WEATHER_DATA_MAPPING: dict[WeatherDimension, WeatherDataSet] = {
     WeatherDimension.WIND: WeatherDataSet(
         fileUrlPath="wind/historical/stundenwerte_FF_00691_19260101_20201231_hist",
         columns=[
-            ColumnMapping("   F", WeatherDataColumns.WIND_V_M_PER_S, dataPreprocessing=clip_to_zero),
+            ColumnMapping("   F", WeatherDataColumns.WIND_V_M_PER_S, dataPreprocessing=wind_dir_cleansing),
             ColumnMapping(
                 "   D",
                 WeatherDataColumns.WIND_DIR_DEGREE,
