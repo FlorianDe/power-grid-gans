@@ -13,7 +13,7 @@ import seaborn as sns
 import random
 from matplotlib import pyplot as plt
 import torch
-from scipy.stats import median_test
+from scipy import stats
 from statsmodels.distributions import ECDF
 from statsmodels.tsa.seasonal import seasonal_decompose
 
@@ -77,6 +77,7 @@ def save_hist_plots_on_every_feature(
         theoretical_col_type = np.repeat("Trainingsdaten", sample_b_len)
         # hour_values = np.arange(sequence_len)
         # hours = np.tile(hour_values, (sample_a_len + sample_b_len) // sequence_len)
+        # Workaround forgot to include the timezone
         sample_a_hours = np.mod((sample_a.index.hour.values + 1), sequence_len)
         sample_b_hours = np.mod((sample_b.index.hour.values + 1), sequence_len)
         tips = pd.DataFrame(
@@ -291,6 +292,7 @@ def ks_test_on_every_feature(evaluator: Evaluator):
     generated_dataframe_samples: list[pd.DataFrame] = []
     ks_test_values = defaultdict(list)
     wasserstein_distances = defaultdict(list)
+    t_test_pvalues = defaultdict(list)
     sample_count = 50
     ks_crit = None
     ks_n, ks_m = None, None
@@ -308,6 +310,9 @@ def ks_test_on_every_feature(evaluator: Evaluator):
             # median_test_log_like_res = median_test(sample_a, sample_b, lambda_="log-likelihood")
             # print(f"{col=} -> {median_test_log_like_res=}")
 
+            ttest_statistic, ttest_p_value = stats.ttest_ind(sample_a, sample_b, equal_var=True, trim=0.2)
+            t_test_pvalues[col].append(ttest_p_value)
+
             ks_D, ks_p = ks2_test(sample_a=sample_a, sample_b=sample_b)
             ks_test_values[col].append(ks_D)
             ks_n, ks_m = len(sample_a), len(sample_b)
@@ -318,17 +323,25 @@ def ks_test_on_every_feature(evaluator: Evaluator):
             if take == (sample_count - 1):
                 ks_crit = ks2_critical_value(sample_a=sample_a, sample_b=sample_b, alpha=ks_alpha)
 
+    # # just print some results
+    # for col in dataframe.columns:
+    #     t_test_values = np.array(t_test_pvalues[col])
+    #     t_test_values_mean = np.mean(t_test_values)
+    #     t_test_values_std = np.std(t_test_values)
+    #     print(f"{col=}, {t_test_values_mean=}, {t_test_values_std=}")
+
     latex_table = r"\begin{table}[htb]" + "\n"
     latex_table += r"\begin{adjustbox}{center,max width=1.0\textwidth}" + "\n"
-    latex_table += r"\begin{tabular}{|l|c|c|c|}" + "\n"
-    latex_table += r"\cline{2-4}" + "\n"
+    latex_table += r"\begin{tabular}{|l|c|c|c|c|}" + "\n"
+    latex_table += r"\cline{2-5}" + "\n"
     latex_table += (
-        r"\multicolumn{1}{c}{} & \multicolumn{2}{|c|}{KS-Test} & \multicolumn{1}{c|}{Wasserstein-Metrik} \\ " + "\n"
+        r"\multicolumn{1}{c}{} & \multicolumn{2}{|c|}{KS-Test} & \multicolumn{1}{c|}{Yuen T-Test} & \multicolumn{1}{c|}{Wasserstein-Metrik} \\ "
+        + "\n"
     )
     # latex_table += r"\cline{2-4}" + "\n"
     latex_table += r"\hline" + "\n"
     latex_table += (
-        r"\multicolumn{1}{|c|}{Merkmal} & $D_{n,m}$ & $c(\alpha ){\sqrt {\frac {n+m}{n\cdot m}}}$ & $W_{1}(\mu ,\nu)$ \\"
+        r"\multicolumn{1}{|c|}{Merkmal} & $D_{n,m}$ & $c(\alpha ){\sqrt {\frac {n+m}{n\cdot m}}}$ & $p_{0.2}$ & $W_{1}(\mu ,\nu)$ \\"
         + "\n"
     )
     latex_table += r"\hline" + "\n"
@@ -340,6 +353,12 @@ def ks_test_on_every_feature(evaluator: Evaluator):
         ks_col_std = np.std(ks_values)
         row += f"${ks_col_mean:.4f}" + r" \pm " + f"{ks_col_std:.4f}$ &"
         row += f"{ks_crit:.4f}&"
+
+        t_test_values = np.array(t_test_pvalues[col])
+        t_test_values_mean = np.mean(t_test_values)
+        t_test_values_std = np.std(t_test_values)
+        row += f"${t_test_values_mean:.4f}" + r" \pm " + f"{t_test_values_std:.4f}$ &"
+
         w_values = np.array(wasserstein_distances[col])
         w_col_mean = np.mean(w_values)
         w_col_std = np.std(w_values)
@@ -350,7 +369,7 @@ def ks_test_on_every_feature(evaluator: Evaluator):
     latex_table += r"\end{tabular}" + "\n"
     latex_table += r"\end{adjustbox}" + "\n"
     latex_table += (
-        r"\caption{Ergebnisse des KS-Tests und der Wasserstein-Metrik zwischen der Gesamtheit der Trainingsdaten $\mu$ von 10 Jahre und "
+        r"\caption{Ergebnisse des KS-Tests, dem Yuen T-Test und der Wasserstein-Metrik zwischen der Gesamtheit der Trainingsdaten $\mu$ von 10 Jahre und "
         + str(sample_count)
         + r" zufälligen Generatorausgaben $\nu_t$ eines nicht Schaltjahres unter Angabe des Mittelwertes und der Standardabweichung. Durch die Wahl von 10 Jahren und einem Jahr gilt $n="
         + str(ks_n)
@@ -358,7 +377,7 @@ def ks_test_on_every_feature(evaluator: Evaluator):
         + str(ks_m)
         + r"$"
         + r" und $\alpha = "
-        + ks_alpha
+        + str(ks_alpha)
         + "$"
         + r".}"
         + "\n"
@@ -425,10 +444,10 @@ def eval(path: PurePath, epoch: int):
     model_path = path / "models" / str(epoch)
     evaluator = Evaluator.load(model_path)
 
-    save_sample_zoom_line_plot(evaluator=evaluator, result_path=result_path, epoch=epoch)
-    with sns.axes_style("darkgrid"):
-        save_hist_plots_on_every_feature(evaluator=evaluator, path=path, result_path=result_path, epoch=epoch)
-    # ks_test_on_every_feature(evaluator=evaluator)
+    # save_sample_zoom_line_plot(evaluator=evaluator, result_path=result_path, epoch=epoch)
+    # with sns.axes_style("darkgrid"):
+    # save_hist_plots_on_every_feature(evaluator=evaluator, path=path, result_path=result_path, epoch=epoch)
+    ks_test_on_every_feature(evaluator=evaluator)
 
 
 if __name__ == "__main__":
