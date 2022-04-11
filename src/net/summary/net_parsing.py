@@ -34,13 +34,13 @@ def print_net_summary(
     print(spacer_line)
     print(f"{spacer*left_pad} {latex_options.label} {spacer*right_pad}")
     print(spacer_line)
-    print(
-        create_summary(model=G, input_size=generator_input_size, dtypes=dtypes).to_latex_table(options=g_latex_options)
-    )
+
+    g_summary = create_summary(model=G, input_size=generator_input_size, dtypes=dtypes)
+    d_summary = create_summary(model=D, input_size=discriminator_input_size, dtypes=dtypes)
+    print(g_summary)
+    print(d_summary)
     print("")
-    print(
-        create_summary(model=D, input_size=discriminator_input_size, dtypes=dtypes).to_latex_table(
-            options=d_latex_options
-        )
-    )
+    print(g_summary.to_latex_table(options=g_latex_options))
+    print("")
+    print(d_summary.to_latex_table(options=d_latex_options))
     print(spacer_line)
