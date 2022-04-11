@@ -31,7 +31,7 @@ from src.data.normalization.np.standard_normalizer import StandardNumpyNormalize
 from src.data.typing import Feature
 from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 
-from src.net.summary.net_summary import LatexTableOptions
+from src.net.summary.net_summary import LatexTableOptions, LatexTableStyle
 from src.net.weight_init import init_weights
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
 from src.plots.typing import PlotData, PlotOptions
@@ -554,8 +554,8 @@ def train_features(data_importer: DWDWeatherDataImporter, columns: set[WeatherDa
     )
     latex_options = LatexTableOptions(
         caption="Conditional GAN {net_type}-Netz in Form eines mehrschichtigen Perzeptrons für Simulationsdaten",
-        label="conditional_gan_fnn_sines_net_simulation_data_{net_type}",
-        # style=LatexTableStyle(scaleWithAdjustbox=1.0),
+        label="conditional_gan_fnn_net_simulation_data_{net_type}",
+        style=LatexTableStyle(scaleWithAdjustbox=1.0),
     )
 
     setup_fnn_models_and_train(
