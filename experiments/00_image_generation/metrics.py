@@ -59,7 +59,14 @@ def save_kl_divergence_example_plot() -> PlotResult:
     P_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_1, scale=norm_std_1)
     Q_pdf = distributions.norm.pdf(sample_points, loc=norm_mean_2, scale=norm_std_2)
 
-    fig, ((ax1, ax2, ax3)) = plt.subplots(ncols=3, nrows=1, figsize=(3 * 4.8, 4.8), sharey="all")
+    def calc_figsize_by_ratio(r_w: float = 1, r_h: float = 1):
+        def_w, def_h = 6.4, 4.8
+        def_A = def_w * def_h
+        h = math.sqrt(def_A / (r_w / r_h))
+        w = def_A / h
+        return (w, h)
+
+    fig, ((ax1, ax2, ax3)) = plt.subplots(ncols=3, nrows=1, figsize=calc_figsize_by_ratio(3, 1), sharey="all")
     ax1.plot(
         sample_points,
         P_pdf,
@@ -146,8 +153,8 @@ def save_ks_test_example_plot() -> PlotResult:
     d1 = np.random.normal(norm_mean_1, norm_std_1, n)
     unif_start, unif_end = -3, 4
     d2 = np.random.uniform(unif_start, unif_end, m)
-
-    fig, ax = plt.subplots(ncols=1, nrows=1)
+    scale = 1
+    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(scale * 6.4, scale * 4.8))
 
     # ax.set_title('Violin-Plot')
     ax.set_ylabel(r"$\displaystyle{F(x)}$")
@@ -232,7 +239,10 @@ def save_timeseries_plot() -> PlotResult:
         DecomposeResultColumns.RESID: r"$\displaystyle{\text{Rest}\;R_t}$",
         DecomposeResultColumns.WEIGHTS: r"$\displaystyle{\text{Gewichte}\;W_t}$",
     }
-    res = draw_timeseries_decomposition_plot(data=decomp_result, translations=translations, figsize=(6.4, 6.4))
+    ratio = 1.1
+    res = draw_timeseries_decomposition_plot(
+        data=decomp_result, translations=translations, rasterized=True, figsize=(ratio * 6.4, 4.8 / ratio)
+    )
 
     return res
 
@@ -252,6 +262,8 @@ def save_qq_plot_defaults() -> list[NamedPlotResult]:
         QQReferenceLine.FIRST_THIRD_QUARTIL,
         QQReferenceLine.LEAST_SQUARES_REGRESSION,
     ]:
+        scale = 0.6
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(scale * 6.4, scale * 4.8))
         qq_res = draw_qq_plot(
             PlotData(
                 data=d1, label=r"$\displaystyle{\text{Stichprobe} \sim " + unif_dist_str(unif_start, unif_end) + "}$"
@@ -265,6 +277,8 @@ def save_qq_plot_defaults() -> list[NamedPlotResult]:
             5000,
             {line},
             [0.25, 0.5, 0.75],
+            plot=PlotResult(fig, ax),
+            rasterized=True,
         )
         results.append(NamedPlotResult(line.name, qq_res))
 
@@ -280,6 +294,8 @@ def save_qq_plot_norm_vs_norm() -> PlotResult:
     d_theo = np.random.normal(norm_mean_theo, norm_std_theo, n)
     d_test = np.random.normal(norm_mean_test, norm_std_test, n)
 
+    scale = 0.6
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(scale * 6.4, scale * 4.8))
     qq_res = draw_qq_plot(
         PlotData(
             data=d_test,
@@ -298,6 +314,8 @@ def save_qq_plot_norm_vs_norm() -> PlotResult:
             # QQReferenceLine.LEAST_SQUARES_REGRESSION
         },
         [0.25, 0.5, 0.75],
+        plot=PlotResult(fig, ax),
+        rasterized=True,
     )
 
     return qq_res
@@ -326,7 +344,8 @@ def save_histogram(normalized: bool = False) -> PlotResult:
     ]
     mean, var = distributions.norm.fit(pds[2].data)
     print(mean, var)
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+    scale = 0.8
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(scale * 6.4, scale * 4.8))
     all_values = functools.reduce(lambda acc, cur: np.concatenate((acc, cur.data)), pds, [])
     bin_width = (max(all_values) - min(all_values)) / 50
     draw_hist_plot(
@@ -439,7 +458,7 @@ if __name__ == "__main__":
     sns.set_context("paper")
     set_latex_plot_params()
 
-    generated_images_folder = get_experiments_folder().joinpath("generated_images")
+    generated_images_folder = get_experiments_folder().joinpath("00_generated_images")
 
     metrics_folder = generated_images_folder.joinpath(f"metrics")
     metrics_folder.mkdir(parents=True, exist_ok=True)
