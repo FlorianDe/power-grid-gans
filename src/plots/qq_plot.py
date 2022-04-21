@@ -48,6 +48,7 @@ def draw_qq_plot(
     extra_quantile_points: Optional[list[float]] = None,
     plot_options: PlotOptions = PlotOptions("QQ-Plot"),
     plot: Optional[PlotResult] = None,
+    rasterized: bool = False,
 ) -> PlotResult:
     def translate(key: __Keys) -> str:
         return __PLOT_DICT[key][plot_options.locale]
@@ -122,7 +123,7 @@ def draw_qq_plot(
             for quantile in extra_quantile_points
         ]
         # ax.plot(theo_quant_values, slope * theo_quant_values + intercept, 'r-', alpha=0.9)
-        ax.scatter(list(map(lambda p: p.x, points)), list(map(lambda p: p.y, points)))
+        ax.scatter(list(map(lambda p: p.x, points)), list(map(lambda p: p.y, points)), rasterized=rasterized)
         for idx in range(len(extra_quantile_points)):
             # ax.annotate(f"{extra_quantile_points[idx]}q", points[idx])
             ax.annotate(
