@@ -46,7 +46,7 @@ def draw_qq_plot(
     quantile_count: Optional[int] = None,
     reference_lines: Optional[set[QQReferenceLine]] = None,
     extra_quantile_points: Optional[list[float]] = None,
-    plot_options: PlotOptions = PlotOptions("QQ-Plot"),
+    plot_options: PlotOptions = PlotOptions(),
     plot: Optional[PlotResult] = None,
     rasterized: bool = False,
 ) -> PlotResult:
@@ -81,7 +81,7 @@ def draw_qq_plot(
 
     fig, ax = plt.subplots(nrows=1, ncols=1) if plot is None else plot
     # ax.margins(x=0, y=0)
-    ax.scatter(theo_quant_values, real_quant_values, alpha=0.2)
+    ax.scatter(theo_quant_values, real_quant_values, alpha=0.2, rasterized=rasterized)
 
     # 1. A line that connect the 25th and 75th percentiles of the data and reference distributions
     if QQReferenceLine.FIRST_THIRD_QUARTIL in reference_lines:
@@ -123,7 +123,7 @@ def draw_qq_plot(
             for quantile in extra_quantile_points
         ]
         # ax.plot(theo_quant_values, slope * theo_quant_values + intercept, 'r-', alpha=0.9)
-        ax.scatter(list(map(lambda p: p.x, points)), list(map(lambda p: p.y, points)), rasterized=rasterized)
+        ax.scatter(list(map(lambda p: p.x, points)), list(map(lambda p: p.y, points)))
         for idx in range(len(extra_quantile_points)):
             # ax.annotate(f"{extra_quantile_points[idx]}q", points[idx])
             ax.annotate(
@@ -138,7 +138,8 @@ def draw_qq_plot(
                 verticalalignment="top",
             )
 
-    ax.set_title(plot_options.title)
+    if plot_options.title:
+        ax.set_title(plot_options.title)
     ax.set_xlabel(theo_pd.label if theo_pd.label is not None else plot_options.x_label)
     ax.set_ylabel(real_pd.label if real_pd.label is not None else plot_options.y_label)
 
