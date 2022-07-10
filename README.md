@@ -1,9 +1,27 @@
 # Power Grid Gans
+![test workflow](https://github.com/FlorianDe/power-grid-gans/.github/workflows/main.yml/badge.svg)
+[![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans)](https://github.com/FlorianDe/power-grid-gans) 
+[![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans?category=files)](https://github.com/FlorianDe/power-grid-gans)
+
 This project contains multiple GANs which are used to generate power grid related data for simulations.
 
+## Table of Contents
+  - [Requirements](#requirements)
+  - [Getting Started](#getting-started)
+  - [Development](#development)
+    - [Running Tests](#running-tests)
+    - [Profiling](#profiling)
+    - [Problems](#problems)
+  - [Misc](#misc)
+    - [Create .gif from images](#create-gif-from-images)
+  - [Docs](#docs)
+    - [GAN Framework](#gan-framework)
+      - [Dataflow](#data-flow)
+      - [Architecture](#architecture)
+  - [Experiments](#experiments)
+
 ## Requirements
-To run the code python3.9 is required. All package requirements are listed in
-the *requirements.txt*
+To run the code python3.9 is required. All package requirements are listed in the *requirements.txt*
 
 ## Getting Started
 It is recommended to run this code in a virtual python environment. To do this,
@@ -86,11 +104,15 @@ pip install atari-py
 pip install gym[atari]
 ```
 
-# Misc
-## Create .gif from images
+## Misc
+### Create .gif from images
 ```bash
 ffmpeg -f image2 -framerate 10 -i img_%03d.png -loop -1 animated.gif
 ```
 
-# Docs
-tbd
+## Docs
+### GAN Framework
+#### Dataflow
+![dataflow-diagram](/.github/images/implementation/data_flow/architecture_data_flow.svg)
+#### Architecture
+![dataflow-diagram](/.github/images/implementation/architecture/architecture_class_diagramm.svg)

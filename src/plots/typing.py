@@ -10,7 +10,7 @@ from matplotlib.axes import Axes
 
 PlotDataType = TypeVar("PlotDataType")
 PlotColor = Union[str, list[str]]
-Point = namedtuple('Point', 'x y')
+Point = namedtuple("Point", "x y")
 
 
 @dataclass
@@ -29,8 +29,8 @@ class PlotResult:
 
 
 class Locale(Enum):
-    DE = 'DE'
-    EN = 'EN'
+    DE = "DE"
+    EN = "EN"
 
 
 @dataclass
@@ -39,7 +39,7 @@ class PlotOptions:
     legend_location: str = "best"
     x_label: Optional[str] = None
     y_label: Optional[str] = None
-    locale: Locale = Locale.DE
+    locale: Locale = Locale.EN
 
 
 @dataclass
