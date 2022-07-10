@@ -41,7 +41,7 @@ def draw_weather_data_trainings_data_time_series_zoom_plot(year: int):
 
 
 def check_processed_unprocessed_data():
-    start_date = "2019-01-01 00:00:00"
+    start_date = "2010-01-01 00:00:00"
     end_date = "2019-12-31 23:00:00"
     data_importer = DWDWeatherDataImporter(start_date=start_date, end_date=end_date, auto_preprocess=False)
     data_importer.initialize()
@@ -69,7 +69,7 @@ def check_processed_unprocessed_data():
 if __name__ == "__main__":
     set_latex_plot_params()
     sns.set_palette("deep", color_codes=True)
-    # check_processed_unprocessed_data()
+    check_processed_unprocessed_data()
     explore_data_root_folder = get_experiments_folder().joinpath("01_explore_weather_data").joinpath("02_explore_data")
     explore_data_root_folder.mkdir(parents=True, exist_ok=True)
 
@@ -79,5 +79,5 @@ if __name__ == "__main__":
             explore_data_root_folder / f"dwd_weather_data_{year}_zoom_plot.pdf", bbox_inches="tight", pad_inches=0
         )
 
-    # plt.close()
-    # plt.show()
+    plt.close()
+    plt.show()
