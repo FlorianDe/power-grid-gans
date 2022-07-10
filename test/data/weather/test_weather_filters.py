@@ -1,7 +1,6 @@
-from turtle import begin_fill
 import unittest
 import numpy as np
-from numpy.testing.utils import assert_array_equal
+from numpy.testing import assert_array_equal
 
 from src.data.weather.weather_filters import relative_wind_dir_calculation
 

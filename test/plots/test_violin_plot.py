@@ -14,9 +14,13 @@ def test_draw_violin_plot():
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(9, 4))
 
-    draw_violin_plot(all_data, PlotOptions(title='Violin plot opt', x_label="X_lbl", y_label="Y_lbl"), PlotResult(fig, axes[0]))
-    draw_box_plot(all_data, PlotOptions(title='Box plot opt', x_label="X_lbl", y_label="Y_lbl"), PlotResult(fig, axes[1]))
+    draw_violin_plot(
+        all_data, PlotOptions(title="Violin plot opt", x_label="X_lbl", y_label="Y_lbl"), PlotResult(fig, axes[0])
+    )
+    draw_box_plot(
+        all_data, PlotOptions(title="Box plot opt", x_label="X_lbl", y_label="Y_lbl"), PlotResult(fig, axes[1])
+    )
     fig.tight_layout()
     fig.suptitle("Box like plots")
     fig.subplots_adjust(wspace=0.4, top=0.8)
-    fig.show()
+    # fig.show()

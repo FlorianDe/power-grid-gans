@@ -32,4 +32,4 @@ def test_draw_zoom_line_plot():
             ),
         ],
     )
-    plt.show()
+    # plt.show()
