@@ -1,23 +1,31 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
+import torch.nn as nn
+import torch.optim as optim
 
 from torch.optim.lr_scheduler import StepLR
 
-from evaluator.evaluator import Evaluator
-from metrics.timeseries_decomposition import decompose_weather_data
-from src.data.weather.weather_dwd_importer import DWDWeatherDataImporter
+from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
+from src.data.weather.weather_dwd_importer import (
+    DWDWeatherDataImporter,
+    WeatherDataColumns,
+    DEFAULT_DATA_START_DATE,
+    DEFAULT_DATA_END_DATE,
+)
+from src.data.weather.weather_dwd_postprocessor import DWDWeatherPostProcessor
 from src.data.data_holder import DataHolder
-from src.gan.trainer.cgan_trainer_old import CGANBasicGenerator, CGANBasicDiscriminator, CGANTrainer
-from src.gan.trainer.typing import TrainModel
+from src.evaluator.evaluator import Evaluator
+from src.gan.trainer.cgan_trainer import CGANTrainer, DiscriminatorFNN, GeneratorFNN
+from src.gan.trainer.typing import ConditionalTrainParameters, TrainModel
+from src.net.weight_init import init_weights
 from src.utils.args_utils import DataclassArgumentParser, Choice, Int, Arg, Str, Float
-from src.utils.datetime_utils import dates_to_conditional_vectors, convert_input_str_to_date
 from src.utils.path_utils import get_root_project_path
-from utils.plot_utils import plot_dfs
+
 
 DEFAULT_SAVE_LOAD_DIRECTORY = get_root_project_path().joinpath("runs").joinpath("model-test").absolute()
 
@@ -44,46 +52,90 @@ class PGGANArgs:
     mode: Choice[Mode] = Mode.TRAIN
     batch_size: Int(help="Number of batches") = 24
     noise_vector_size: Int(help="Size of the noise vector") = 50
-    epochs: Int = 100
+    epochs: Int = 500
     lr: Float(help="Learning rate for optimizers") = 0.003
     beta1: Float(help="Beta1 hyperparameter for the Adam optimizers") = 0.9
+    beta2: Float(help="Beta2 hyperparameter for the Adam optimizers") = 0.99
     device: Arg(type=torch.device) = torch.device("cpu")
     dataset: Choice[Datasets] = Datasets.WEATHER
     model: Choice[Nets] = Nets.CGAN
     save_path: Str = DEFAULT_SAVE_LOAD_DIRECTORY
-    start_date: Str = "2009.01.01"
-    end_date: Str = "2019.12.31"
+    start_date: Str = DEFAULT_DATA_START_DATE
+    end_date: Str = DEFAULT_DATA_END_DATE
     load_path: Str = DEFAULT_SAVE_LOAD_DIRECTORY
+    results_path: Str = DEFAULT_SAVE_LOAD_DIRECTORY / "generated_data"
     seed: Int = 1337
 
 
-def get_data_holder(dataset: Choice[Datasets]) -> DataHolder:
-    if dataset is Datasets.WEATHER:
-        data_importer = DWDWeatherDataImporter()
+def get_data_holder(args: PGGANArgs) -> DataHolder:
+    if args.dataset is Datasets.WEATHER:
+        data_importer = DWDWeatherDataImporter(start_date=args.start_date, end_date=args.end_date)
         data_importer.initialize()
+        columns_to_use = set(
+            [
+                WeatherDataColumns.GH_W_PER_M2,
+                WeatherDataColumns.DH_W_PER_M2,
+                WeatherDataColumns.WIND_DIR_DEGREE,
+                WeatherDataColumns.WIND_V_M_PER_S,
+                WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+            ]
+        )
+        conditions = np.array(data_importer.get_day_of_year_values()) - 1  # days to conditions from 0 - 365
+        data_subset = data_importer.get_data_subset(columns_to_use)
         return DataHolder(
-            data_importer.data.values.astype(np.float32),
-            data_importer.get_feature_labels(),
-            np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
+            data=data_subset.values.astype(np.float32),
+            data_labels=data_subset.columns.to_list(),
+            dates=np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
+            conditions=conditions,
+            normalizer_constructor=StandardNumpyNormalizer,
         )
     else:
         raise ValueError("Not supported yet!")
 
 
-def get_cgan_trainer(features, noise_vector_size, batch_size, lr, beta1):
-    G_net = CGANBasicGenerator(input_size=noise_vector_size + 14, out_size=features, hidden_layers=[200])
-    G_optim = torch.optim.Adam(G_net.parameters(), lr=lr, betas=(beta1, 0.999))
-    G_sched = StepLR(G_optim, step_size=30, gamma=0.1)
-    G = TrainModel(G_net, G_optim, G_sched)
+def get_cgan_trainer(data_holder: DataHolder, args: PGGANArgs):
+    conditions = 366
+    dropout = 0.3
+    features_len = data_holder.get_feature_size()
+    params = ConditionalTrainParameters(
+        batch_size=32, embedding_dim=int(24 * 1.5 * features_len), features_len=features_len
+    )
 
-    D_net = CGANBasicDiscriminator(input_size=features + 14, out_size=1, hidden_layers=[100, 50, 20])
-    D_optim = torch.optim.Adam(D_net.parameters(), lr=lr, betas=(beta1, 0.999))
-    D_sched = StepLR(D_optim, step_size=30, gamma=0.1)
-    D = TrainModel(D_net, D_optim, D_sched)
+    model_G = GeneratorFNN(
+        latent_vector_size=params.latent_vector_size,
+        features=features_len,
+        sequence_len=params.sequence_len,
+        dropout=dropout,
+        conditions=conditions,
+        embeddings=params.embedding_dim,
+    )
+    optimizer_G = optim.Adam(model_G.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    scheduler_G = StepLR(optimizer_G, step_size=50, gamma=0.5)
+    generator = TrainModel(model=model_G, optimizer=optimizer_G, scheduler=scheduler_G)
 
-    trainer = CGANTrainer(G, D, data_holder, noise_vector_size, batch_size, "cpu")
+    model_D = DiscriminatorFNN(
+        features=features_len,
+        sequence_len=params.sequence_len,
+        conditions=conditions,
+        embeddings=params.embedding_dim,
+        out_features=1,
+        dropout=dropout,
+    )
+    optimizer_D = optim.Adam(model_D.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    scheduler_D = StepLR(optimizer_D, step_size=50, gamma=0.5)
+    discriminator = TrainModel(model=model_D, optimizer=optimizer_D, scheduler=scheduler_D)
+    init_weights(model_D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu", 1e-2))
 
-    return trainer
+    return CGANTrainer(
+        data_holder=data_holder,
+        generator=generator,
+        discriminator=discriminator,
+        # batch_reshaper=fnn_batch_reshaper,
+        # noise_generator=fnn_noise_generator,
+        params=params,
+        # callback_options=[],
+        # latex_options=latex_options,
+    )
 
 
 if __name__ == "__main__":
@@ -91,16 +143,10 @@ if __name__ == "__main__":
     print("args:", args)
 
     if args.mode is Mode.TRAIN:
-        data_holder = get_data_holder(args.dataset)
+        data_holder = get_data_holder(args)
         trainer = None
         if args.model is Nets.CGAN:
-            trainer = get_cgan_trainer(
-                features=data_holder.get_feature_size(),
-                noise_vector_size=args.noise_vector_size,
-                batch_size=args.batch_size,
-                lr=args.lr,
-                beta1=args.lr,
-            )
+            trainer = get_cgan_trainer(data_holder, args)
         else:
             raise ValueError("Not supported yet!")
 
@@ -108,24 +154,14 @@ if __name__ == "__main__":
         trainer.save_model(str(args.save_path))
     elif args.mode is Mode.EVAL:
         evaluator = Evaluator.load(str(args.load_path))
-        start = convert_input_str_to_date(str(args.start_date))
-        end = convert_input_str_to_date(str(args.end_date))
-        generated_data = evaluator.generate(start, end).numpy().transpose()
-
-        print(f"{generated_data.shape=}")
-        data = pd.DataFrame(
-            index=pd.date_range(
-                start=datetime(start.year, start.month, start.day),
-                end=datetime(end.year, end.month, end.day, 23, 59, 59),
-                tz="Europe/Berlin",
-                freq="H",
-            )
-        )
-        for i in range(generated_data.shape[0]):
-            data[evaluator.feature_labels[i].label] = generated_data[i]
-            decompose_weather_data(data[evaluator.feature_labels[i].label]).plot()
-
-        plot_dfs([data])
+        start = datetime.fromisoformat("2020-01-01T00:00:00")
+        end = datetime.fromisoformat("2020-12-31T23:00:00")
+        weather_post_processor = DWDWeatherPostProcessor()
+        dataframe = evaluator.generate_dataframe(start, end)
+        if args.dataset is Datasets.WEATHER:
+            dataframe = weather_post_processor(dataframe)
+        Path(args.results_path).mkdir(parents=True, exist_ok=True)
+        dataframe.to_hdf(args.results_path / "result_generated_data.hdf", "weather", "w")
 
     else:
         raise ValueError(f"Mode: {args.mode} is not supported.")

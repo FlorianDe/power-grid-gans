@@ -28,7 +28,7 @@ The generated data using the developed framework currently contains an increased
     - [GAN Framework](#gan-framework)
       - [Dataflow](#data-flow)
       - [Architecture](#architecture)
-  - [Experiments](#experiments)
+      - [CLI](#cli)
 
 ## Requirements
 To run the code python3.9 is required. All package requirements are listed in the *requirements.txt*
@@ -126,3 +126,16 @@ ffmpeg -f image2 -framerate 10 -i img_%03d.png -loop -1 animated.gif
 ![dataflow-diagram](/.github/images/implementation/data_flow/architecture_data_flow.svg)
 #### Architecture
 ![dataflow-diagram](/.github/images/implementation/architecture/architecture_class_diagramm.svg)
+### CLI
+Help overview
+```bash
+python3 -m src.pggan --help
+```
+### Train
+```bash
+python3 -m src.pggan
+```
+### Eval
+```bash
+python3 -m src.pggan --mode eval
+```

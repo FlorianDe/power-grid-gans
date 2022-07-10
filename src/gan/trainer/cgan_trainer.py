@@ -22,8 +22,6 @@ from src.gan.trainer.typing import (
     TrainParameters,
     TrainerCallback,
 )
-from src.net import CustomModule
-from src.net.dynamic import FNN
 from src.net.summary.net_parsing import print_net_summary
 from src.net.summary.net_summary import LatexTableOptions
 from src.utils.datetime_utils import dates_to_conditional_vectors
@@ -38,6 +36,95 @@ def default_fnn_batch_reshaper(data_batch: Tensor, current_batch_size: int, para
 
 def default_fnn_noise_generator(current_batch_size: int, params: TrainParameters) -> Tensor:
     return torch.randn(current_batch_size, params.latent_vector_size, device=params.device)
+
+
+class DiscriminatorFNN(nn.Module):
+    def __init__(
+        self,
+        features: int,
+        sequence_len: int,
+        conditions: int,
+        embeddings: int,
+        out_features: int = 1,
+        dropout: float = 0.5,
+    ):
+        super(DiscriminatorFNN, self).__init__()
+        self.features = features
+        self.sequence_len = sequence_len
+        input_size = sequence_len * features
+
+        def dense_block(input: int, output: int, normalize=True):
+            negative_slope = 1e-2
+            layers: list[nn.Module] = []
+            if normalize:
+                layers.append(nn.Dropout(p=dropout))
+            layers.append(nn.Linear(input, output))
+            # layers.append(nn.BatchNorm1d(output, 0.8))
+            layers.append(nn.LeakyReLU(negative_slope, inplace=True))
+            return layers
+
+        self.embedding = nn.Embedding(conditions, embeddings)
+        self.fnn = nn.Sequential(
+            *dense_block(input_size + embeddings, 2 * input_size, False),
+            *dense_block(2 * input_size, 4 * input_size),
+            *dense_block(4 * input_size, 8 * input_size),
+            # *dense_block(8 * input_size, 16 * input_size),
+            # *dense_block(16 * input_size, 8 * input_size),
+            *dense_block(8 * input_size, 4 * input_size),
+            nn.Linear(4 * input_size, out_features),
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        embedded_conditions = self.embedding(condition)
+        x = torch.cat((x, embedded_conditions), dim=1)
+        x = self.fnn(x)
+        x = self.sigmoid(x)
+        return x
+
+
+class GeneratorFNN(nn.Module):
+    def __init__(
+        self,
+        latent_vector_size: int,
+        features: int,
+        sequence_len: int,
+        conditions: int,
+        embeddings: int,
+        dropout: float = 0.5,
+    ):
+        super(GeneratorFNN, self).__init__()
+        self.features = features
+        self.sequence_len = sequence_len
+        self.embedding = nn.Embedding(conditions, embeddings)
+
+        def dense_block(input: int, output: int, normalize=True):
+            negative_slope = 1e-2
+            layers: list[nn.Module] = []
+            if normalize:
+                layers.append(nn.Dropout(p=dropout))
+            layers.append(nn.Linear(input, output))
+            # layers.append(nn.BatchNorm1d(output, 0.8))
+            layers.append(nn.LeakyReLU(negative_slope, inplace=True))
+            return layers
+
+        self.fnn = nn.Sequential(
+            *dense_block(latent_vector_size + embeddings, 2 * latent_vector_size),
+            *dense_block(2 * latent_vector_size, 4 * latent_vector_size),
+            *dense_block(4 * latent_vector_size, 8 * latent_vector_size),
+            # *dense_block(8 * latent_vector_size, 16 * latent_vector_size),
+            # *dense_block(16 * latent_vector_size, 8 * latent_vector_size),
+            *dense_block(8 * latent_vector_size, 4 * latent_vector_size),
+            nn.Linear(4 * latent_vector_size, features * sequence_len),
+        )
+        self.tanh = nn.Tanh()
+
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        embedded_conditions = self.embedding(condition)
+        x = torch.cat((x, embedded_conditions), dim=1)
+        x = self.fnn(x)
+        # x = self.tanh(x)
+        return x
 
 
 class CGANTrainer(BaseTrainer):
