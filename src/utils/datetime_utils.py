@@ -1,3 +1,4 @@
+import pytz
 from datetime import date, datetime, timedelta
 from functools import reduce
 
@@ -60,7 +61,7 @@ def dates_to_days_in_year(months: numpy.ndarray, days: numpy.ndarray, hours: num
 
 def format_timestamp(timestamp_ns: int, datetime_format: str = "%Y_%m_%d_%H_%M_%S"):
     ns_to_s_factor = 1e9  # unit factor from seconds to nanoseconds
-    dt = datetime.fromtimestamp(timestamp_ns // ns_to_s_factor)
+    dt = datetime.fromtimestamp(timestamp_ns // ns_to_s_factor, tz=pytz.utc)
     return "{}_{:09.0f}".format(dt.strftime(datetime_format), timestamp_ns % ns_to_s_factor)
 
 
