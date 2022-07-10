@@ -3,7 +3,17 @@
 [![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans)](https://github.com/FlorianDe/power-grid-gans) 
 [![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans?category=files)](https://github.com/FlorianDe/power-grid-gans)
 
-This project contains multiple GANs which are used to generate power grid related data for simulations.
+Generative Adversarial Networks (GANs) are nowadays not only used to create novel digital artworks, but can also be found in various other domains such as text generation, music, medicine, finance, smart grids, general training data generation and many more.
+
+This work also addresses the area of smart grids by building on the knowledge gained from other areas and existing GAN extensions to create an extensible GAN framework that makes it possible to generate novel power grid simulation data, initially using weather data, for [MIDAS](https://gitlab.com/midas-mosaik/midas).
+
+This is an experiment-based work, where the developed methods and concepts were first applied to sinusoidal synthetic data in the form of a feasibility study, and then extended to weather data of the power grid simulation of MIDAS, tested against a set of metrics, and additionally validated visually with the help of plots. 
+
+A GAN framework was created that allows the generation of similarly distributed weather simulation data using a CGAN. 
+Great attention was paid to the extensibility and versatility of the GAN framework through an elaborated software architecture.
+During the development many problems of the GAN training arose and became visible.
+The generated data using the developed framework currently contains an increased temporal oscillation in contrast to the training data, which could potentially be reduced by a variety of techniques based on this work.
+
 
 ## Table of Contents
   - [Requirements](#requirements)
