@@ -1,4 +1,8 @@
 # Power Grid Gans
+![test workflow](https://github.com/FlorianDe/power-grid-gans/.github/workflows/main.yml/badge.svg)
+[![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans)](https://github.com/FlorianDe/power-grid-gans) 
+[![](https://tokei.rs/b1/github/FlorianDe/power-grid-gans?category=files)](https://github.com/FlorianDe/power-grid-gans)
+
 This project contains multiple GANs which are used to generate power grid related data for simulations.
 
 ## Requirements
