@@ -33,17 +33,17 @@ from experiments.experiments_utils.train_typing import (
     BatchReshaper,
     NoiseGenerator,
 )
-from experiments.experiments_utils.net_parsing import print_net_summary
-from experiments.experiments_utils.weight_init import init_weights
+from src.net.summary.net_parsing import print_net_summary
+from src.net.weight_init import init_weights
 from src.data.data_holder import DataHolder
 from src.data.normalization.np.minmax_normalizer import MinMaxNumpyNormalizer
 from src.data.normalization.np.standard_normalizer import StandardNumpyNormalizer
 from src.data.typing import Feature
-from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter
+from src.data.weather.weather_dwd_importer import DEFAULT_DATA_START_DATE, DWDWeatherDataImporter, WeatherDataColumns
 
-from src.net.net_summary import LatexTableOptions, LatexTableStyle
+from src.net.summary.net_summary import LatexTableOptions, LatexTableStyle
 from src.plots.histogram_plot import HistPlotData, draw_hist_plot
-from src.plots.timeseries_plot import DecomposeResultColumns, draw_timeseries_plot
+from src.plots.timeseries_decomposition_plot import DecomposeResultColumns, draw_timeseries_decomposition_plot
 from src.utils.datetime_utils import (
     PANDAS_DEFAULT_DATETIME_FORMAT,
     convert_input_str_to_date,
@@ -84,8 +84,8 @@ class DiscriminatorFNN(nn.Module):
         def dense_block(input: int, output: int, normalize=True):
             negative_slope = 1e-2
             layers: list[nn.Module] = []
-            if normalize:
-                layers.append(nn.Dropout(p=dropout))
+            # if normalize:
+            # layers.append(nn.Dropout(p=dropout))
             layers.append(nn.Linear(input, output))
             # layers.append(nn.BatchNorm1d(output, 0.8))
             layers.append(nn.LeakyReLU(negative_slope, inplace=True))
@@ -95,7 +95,7 @@ class DiscriminatorFNN(nn.Module):
         self.fnn = nn.Sequential(
             *dense_block(input_size + embeddings, 2 * input_size, False),
             *dense_block(2 * input_size, 4 * input_size),
-            # *dense_block(4 * input_size, 4 * input_size),
+            *dense_block(4 * input_size, 4 * input_size),
             nn.Linear(4 * input_size, out_features),
         )
         self.sigmoid = nn.Sigmoid()
@@ -126,8 +126,8 @@ class GeneratorFNN(nn.Module):
         def dense_block(input: int, output: int, normalize=True):
             negative_slope = 1e-2
             layers: list[nn.Module] = []
-            if normalize:
-                layers.append(nn.Dropout(p=dropout))
+            # if normalize:
+            # layers.append(nn.Dropout(p=dropout))
             layers.append(nn.Linear(input, output))
             # layers.append(nn.BatchNorm1d(output, 0.8))
             layers.append(nn.LeakyReLU(negative_slope, inplace=True))
@@ -136,7 +136,7 @@ class GeneratorFNN(nn.Module):
         self.fnn = nn.Sequential(
             *dense_block(latent_vector_size + embeddings, 2 * latent_vector_size),
             *dense_block(2 * latent_vector_size, 4 * latent_vector_size),
-            # *dense_block(4 * latent_vector_size, 4 * latent_vector_size),
+            *dense_block(4 * latent_vector_size, 4 * latent_vector_size),
             nn.Linear(4 * latent_vector_size, features * sequence_len),
         )
         self.tanh = nn.Tanh()
@@ -234,6 +234,12 @@ class GeneratorCNN(nn.Module):
         return self.main(x)
 
 
+"""
+The conditonal wgan trainer implementation with gradient penalty was derived from the following wgan pytorch implementation:
+https://github.com/EmilienDupont/wgan-gp
+"""
+
+
 class CWGANGPTrainer:
     def __init__(
         self,
@@ -285,6 +291,7 @@ class CWGANGPTrainer:
         if self.use_cuda:
             alpha = alpha.cuda()
         interpolated = alpha * real_data.data + (1 - alpha) * generated_data.data
+        interpolated.requires_grad_(True)
         # interpolated = Variable(interpolated, requires_grad=True)
         # if self.use_cuda:
         # interpolated = interpolated.cuda()
@@ -301,20 +308,24 @@ class CWGANGPTrainer:
             else torch.ones(prob_interpolated.size()),
             create_graph=True,
             retain_graph=True,
+            only_inputs=True,
         )[0]
 
         # Gradients have shape (batch_size, num_channels, img_width, img_height),
         # so flatten to easily take norm per example in batch
         gradients = gradients.view(batch_size, -1)
-        self.losses["gradient_norm"].append(gradients.norm(2, dim=1).mean().item())
 
         # Derivatives of the gradient close to 0 can cause problems because of
         # the square root, so manually calculate norm and add epsilon
-        epsilon = 1e-12
-        gradients_norm = torch.sqrt(torch.sum(gradients**2, dim=1) + epsilon)
+        # epsilon = 1e-12
+        # gradients_norm = torch.sqrt(torch.sum(gradients**2, dim=1) + epsilon)
 
         # Return gradient penalty
-        return self.gp_weight * ((gradients_norm - 1) ** 2).mean()
+        # return self.gp_weight * ((gradients_norm - 1) ** 2).mean()
+
+        gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.gp_weight
+        self.losses["gradient_norm"].append(gradient_penalty.item())
+        return gradient_penalty
 
     def _generator_train_iteration(self, data_batch, conditions_batch):
         """ """
@@ -413,6 +424,14 @@ class CWGANGPTrainer:
                     save_fig(fig, sample_save_path / f"{epoch}_cond_ALL.{self.plots_file_ending}")
 
 
+def weights_init(m):
+    if isinstance(m, nn.Linear):
+        if m.weight is not None:
+            nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
+
+
 def setup_fnn_models_and_train(
     data_holder: DataHolder,
     params: ConditionalTrainParameters,
@@ -440,6 +459,9 @@ def setup_fnn_models_and_train(
         out_features=1,
         dropout=dropout,
     )
+
+    weights_init(G)
+    weights_init(D)
 
     # init_weights(G, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
     # init_weights(D, "xavier", init_gain=nn.init.calculate_gain("leaky_relu"))
@@ -585,17 +607,23 @@ def main():
     # rng = np.random.default_rng(seed=0) # use for numpy
     torch.manual_seed(manualSeed)
     start_date_str = DEFAULT_DATA_START_DATE
-    end_date_str = "2010-12-31 23:00:00"  # "2019-12-31 23:00:00"
-    start_date = convert_input_str_to_date(start_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
-    end_date = convert_input_str_to_date(end_date_str, format=PANDAS_DEFAULT_DATETIME_FORMAT)
+    end_date_str = "2019-12-31 23:00:00"  # "2019-12-31 23:00:00"
     data_importer = DWDWeatherDataImporter(start_date=start_date_str, end_date=end_date_str)
     data_importer.initialize()
-    # conditions = np.array([get_day_in_year_from_date(d) for d in interval_generator(start_date, end_date)])
+    conditions = np.array(data_importer.get_day_of_year_values()) - 1  # days to conditions from 0 - 365
+    columns_to_use = set(
+        [
+            WeatherDataColumns.DH_W_PER_M2,
+            WeatherDataColumns.GH_W_PER_M2,
+            WeatherDataColumns.T_AIR_DEGREE_CELSIUS,
+            WeatherDataColumns.WIND_DIR_DEGREE_DELTA,
+        ]
+    )
     data_holder = DataHolder(
-        data=data_importer.data.values.astype(np.float32),
-        data_labels=data_importer.get_feature_labels(),
+        data=data_importer.get_data_subset(columns_to_use).values.astype(np.float32),
+        # data_labels=data_importer.get_feature_labels(),
         dates=np.array(dates_to_conditional_vectors(*data_importer.get_datetime_values())),
-        conditions=np.array(data_importer.get_day_of_year_values()),
+        conditions=conditions,
         normalizer_constructor=StandardNumpyNormalizer,
     )
     train_params = ConditionalTrainParameters(batch_size=64, epochs=4000, embedding_dim=32)
